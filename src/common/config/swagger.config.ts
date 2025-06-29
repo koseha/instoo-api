@@ -1,8 +1,12 @@
 // src/config/swagger.config.ts
 import { INestApplication } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
-import { InstooApiResponse } from "../dto/instoo-api-response.dto";
-import { StringResponseDto } from "src/string.response.dto";
+import {
+  InstooApiResponse,
+  PageCursorDto,
+  PagedResponse,
+  PageInfoDto,
+} from "../dto/instoo-api-response.dto";
 
 export function setupSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()
@@ -56,7 +60,8 @@ export function setupSwagger(app: INestApplication): void {
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {
-    extraModels: [InstooApiResponse, StringResponseDto],
+    // swagger schema 추가
+    extraModels: [InstooApiResponse, PagedResponse, PageCursorDto, PageInfoDto],
   });
 
   SwaggerModule.setup("api-docs", app, document, {
