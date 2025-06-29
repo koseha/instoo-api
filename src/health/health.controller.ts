@@ -1,20 +1,21 @@
 // src/app.controller.ts (복잡한 데코레이터 버전)
 import { Controller, Get } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { AppService } from "./app.service";
-import { InstooApiResponse } from "./common/dto/instoo-api-response.dto";
+
 import {
-  ApiInstooResponse,
   ApiInstooErrorResponse,
+  ApiInstooResponse,
   ApiInstooResponses,
   ApiInstooSimpleResponse,
-} from "./common/decorators/api-response.decorator";
+} from "@/common/decorators/api-response.decorator";
 import { StringResponseDto } from "./string.response.dto";
+import { InstooApiResponse } from "@/common/dto/instoo-api-response.dto";
+import { HealthService } from "./health.service";
 
-@ApiTags("App")
+@ApiTags("Health")
 @Controller()
-export class AppController {
-  constructor(private readonly appService: AppService) {}
+export class HealthController {
+  constructor(private readonly healthService: HealthService) {}
 
   @Get()
   @ApiOperation({
