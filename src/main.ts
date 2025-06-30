@@ -25,6 +25,9 @@ async function bootstrap(): Promise<void> {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      transformOptions: {
+        enableImplicitConversion: true, // 암시적 타입 변환 허용
+      },
     }),
   );
 
