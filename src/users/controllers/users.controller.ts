@@ -37,7 +37,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   async getMyProfile(@Req() req: AuthenticatedRequest): Promise<InstooApiResponse<UserInfoDto>> {
-    const userId = req.user!.uuid;
+    const userId = req.user!.sub;
     const user = await this.usersService.getMyProfile(userId);
     return InstooApiResponse.success(user, "내 정보를 성공적으로 조회했습니다.");
   }

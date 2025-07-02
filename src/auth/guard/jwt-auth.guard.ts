@@ -1,20 +1,15 @@
 import { Injectable, ExecutionContext, UnauthorizedException, CanActivate } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { UsersService } from "@/users/users.service";
 import { JwtPayload } from "../strategies/jwt.strategy";
-import { User } from "@/users/entities/user.entity";
 import { Request } from "express";
 
 export interface AuthenticatedRequest extends Request {
-  user?: User;
+  user?: JwtPayload;
 }
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly usersService: UsersService,
-  ) {}
+  constructor(private readonly jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -26,13 +21,13 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
-      const user = await this.usersService.findByUuid(payload.sub);
+      // const user = await this.usersService.findByUuid(payload.sub);
 
-      if (!user) {
+      if (!payload) {
         throw new UnauthorizedException("유효하지 않은 사용자입니다.");
       }
 
-      request.user = user;
+      request.user = payload;
       return true;
     } catch {
       throw new UnauthorizedException("유효하지 않은 토큰입니다.");

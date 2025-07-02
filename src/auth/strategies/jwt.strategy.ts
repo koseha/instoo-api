@@ -3,11 +3,12 @@ import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { ConfigService } from "@nestjs/config";
 import { AuthService } from "../services/auth.service";
+import { UserRole } from "@/common/constants/user-role.enum";
 
 export interface JwtPayload {
   sub: string; // user id
   nickname: string;
-  role: string;
+  role: UserRole;
   iat?: number;
   exp?: number;
 }
