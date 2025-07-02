@@ -5,10 +5,12 @@ import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
 
 import { User } from "@/users/entities/user.entity";
-import { AuthCallbackResponseDto, UserInfoDto } from "../dto/auth-response.dto";
+import { AuthCallbackResponseDto } from "../dto/auth-response.dto";
 import { OAuthProvider } from "@/common/constants/oauth-provider.enum";
 import axios from "axios";
 import { UserRole } from "@/common/constants/user-role.enum";
+import { UserInfoDto } from "@/users/dto/user-response.dto";
+import { JwtPayload } from "../strategies/jwt.strategy";
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -27,15 +29,6 @@ interface GoogleUserInfo {
   family_name: string;
   picture: string;
   locale: string;
-}
-
-interface JwtPayload {
-  sub: number; // user id
-  email: string;
-  name: string;
-  role: string;
-  iat?: number;
-  exp?: number;
 }
 
 interface RefreshTokenPayload {
@@ -85,7 +78,7 @@ export class AuthService {
   /**
    * OAuth 콜백 처리 (토큰 교환 ~ JWT 생성)
    */
-  async processGoogleAuth(code: string, state?: string): Promise<AuthCallbackResponseDto> {
+  async processGoogleAuth(code: string, _state?: string): Promise<AuthCallbackResponseDto> {
     try {
       // Google에서 액세스 토큰 교환
       const tokenResponse = await this.exchangeCodeForTokens(code);
@@ -228,9 +221,8 @@ export class AuthService {
     expiresAt: string;
   } {
     const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      name: user.nickname, // user.name을 user.nickname으로 수정
+      sub: user.uuid,
+      nickname: user.nickname,
       role: user.role,
     };
 
@@ -298,7 +290,7 @@ export class AuthService {
    */
   async validateJwtPayload(payload: JwtPayload): Promise<User> {
     const user = await this.userRepository.findOne({
-      where: { id: payload.sub, isActive: true },
+      where: { uuid: payload.sub, isActive: true },
     });
 
     if (!user) {

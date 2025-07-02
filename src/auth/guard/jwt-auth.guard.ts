@@ -1,49 +1,46 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
-import { Reflector } from "@nestjs/core";
+import { Injectable, ExecutionContext, UnauthorizedException, CanActivate } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { UsersService } from "@/users/users.service";
+import { JwtPayload } from "../strategies/jwt.strategy";
 import { User } from "@/users/entities/user.entity";
+import { Request } from "express";
+
+export interface AuthenticatedRequest extends Request {
+  user?: User;
+}
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard("jwt") {
-  constructor(private reflector: Reflector) {
-    super();
-  }
+export class JwtAuthGuard implements CanActivate {
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly usersService: UsersService,
+  ) {}
 
-  /**
-   * 인증 여부를 판단하는 메서드.
-   * - @Public() 데코레이터가 붙은 핸들러인 경우 인증을 건너뜀.
-   * - 그 외의 경우 passport-jwt 전략을 이용한 인증 수행.
-   */
-  canActivate(context: ExecutionContext) {
-    const isPublic = this.reflector.getAllAndOverride<boolean>("isPublic", [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const token = this.extractTokenFromHeader(request);
 
-    if (isPublic) {
+    if (!token) {
+      throw new UnauthorizedException("토큰이 제공되지 않았습니다.");
+    }
+
+    try {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
+      const user = await this.usersService.findByUuid(payload.sub);
+
+      if (!user) {
+        throw new UnauthorizedException("유효하지 않은 사용자입니다.");
+      }
+
+      request.user = user;
       return true;
+    } catch {
+      throw new UnauthorizedException("유효하지 않은 토큰입니다.");
     }
-
-    return super.canActivate(context);
   }
 
-  /**
-   * passport 인증 전략 실행 후 호출되는 메서드.
-   * - 인증 에러가 있거나 user 객체가 없으면 UnauthorizedException 예외 발생.
-   * - 정상 인증된 경우 user 객체를 반환하여 request.user로 주입됨.
-   *
-   * 시그니처는 passport 내부 AuthGuard 구현과 호환되도록 맞춰야 함.
-   */
-  handleRequest<TUser = User>(
-    err: any,
-    user: any,
-    _info: any,
-    _context: ExecutionContext,
-    _status?: any,
-  ): TUser {
-    if (err || !user) {
-      throw err || new UnauthorizedException("인증이 필요합니다.");
-    }
-    return user as TUser;
+  private extractTokenFromHeader(request: Request): string | undefined {
+    const [type, token] = request.headers.authorization?.split(" ") ?? [];
+    return type === "Bearer" ? token : undefined;
   }
 }

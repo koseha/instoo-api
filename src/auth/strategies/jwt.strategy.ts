@@ -4,10 +4,9 @@ import { ExtractJwt, Strategy } from "passport-jwt";
 import { ConfigService } from "@nestjs/config";
 import { AuthService } from "../services/auth.service";
 
-interface JwtPayload {
-  sub: number;
-  email: string;
-  name: string;
+export interface JwtPayload {
+  sub: string; // user id
+  nickname: string;
   role: string;
   iat?: number;
   exp?: number;
@@ -36,8 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     try {
       const user = await this.authService.validateJwtPayload(payload);
       return user;
-    } catch (error) {
-      console.error(error);
+    } catch {
       throw new UnauthorizedException("유효하지 않은 토큰입니다.");
     }
   }

@@ -5,6 +5,8 @@ import { AuthModule } from "./auth/auth.module";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { getDatabaseConfig } from "./common/config/database.config";
 import { User } from "./users/entities/user.entity";
+import { UsersController } from "./users/controllers/users.controller";
+import { UsersService } from "./users/users.service";
 
 const nodeEnv = process.env.NODE_ENV || "development";
 
@@ -23,7 +25,7 @@ const nodeEnv = process.env.NODE_ENV || "development";
     HealthModule,
     AuthModule,
   ],
-  controllers: [],
-  providers: [],
+  controllers: [UsersController],
+  providers: [UsersService],
 })
 export class AppModule {}
