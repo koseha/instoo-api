@@ -32,22 +32,23 @@ async function bootstrap(): Promise<void> {
   );
 
   // CORS 설정
-  app.enableCors({
-    origin: !isProduction
-      ? true // 개발 환경은 모든 origin 허용
-      : (
-          origin: string | undefined,
-          callback: (error: Error | null, success?: boolean) => void,
-        ): void => {
-          if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-          } else {
-            callback(new Error("Not allowed by CORS"));
-          }
-        },
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE", // 허용할 HTTP 메서드
-    allowedHeaders: "Content-Type, Authorization", // 허용할 헤더
-  });
+  app.enableCors();
+  // app.enableCors({
+  //   origin: !isProduction
+  //     ? true // 개발 환경은 모든 origin 허용
+  //     : (
+  //         origin: string | undefined,
+  //         callback: (error: Error | null, success?: boolean) => void,
+  //       ): void => {
+  //         if (!origin || allowedOrigins.includes(origin)) {
+  //           callback(null, true);
+  //         } else {
+  //           callback(new Error("Not allowed by CORS"));
+  //         }
+  //       },
+  //   methods: "GET,HEAD,PUT,PATCH,POST,DELETE", // 허용할 HTTP 메서드
+  //   allowedHeaders: "Content-Type, Authorization", // 허용할 헤더
+  // });
 
   // Swagger 설정 (프로덕션 환경이 아닐 때만)
   if (!isProduction) {
