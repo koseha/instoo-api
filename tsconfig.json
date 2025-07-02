@@ -21,7 +21,7 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "typeRoots": ["./node_modules/@types", "./types"],
-    "types": ["node", "express"]
+    "types": ["jest", "node", "express"]
   },
-  "include": ["src/**/*", "types/**/*"]
+  "include": ["src/**/*", "types/**/*", "src/**/*.spec.ts", "test/**/*.ts"]
 }

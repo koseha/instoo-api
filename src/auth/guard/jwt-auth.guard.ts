@@ -2,6 +2,7 @@ import { Injectable, ExecutionContext, UnauthorizedException, CanActivate } from
 import { JwtService } from "@nestjs/jwt";
 import { JwtPayload } from "../strategies/jwt.strategy";
 import { Request } from "express";
+import { InvalidUserException } from "@/common/exceptions/invalid-user.exception";
 
 export interface AuthenticatedRequest extends Request {
   user?: JwtPayload;
@@ -24,12 +25,17 @@ export class JwtAuthGuard implements CanActivate {
       // const user = await this.usersService.findByUuid(payload.sub);
 
       if (!payload) {
-        throw new UnauthorizedException("유효하지 않은 사용자입니다.");
+        throw new InvalidUserException();
       }
 
       request.user = payload;
       return true;
-    } catch {
+    } catch (error) {
+      // 커스텀 예외는 그대로 전달
+      if (error instanceof InvalidUserException) {
+        throw error;
+      }
+
       throw new UnauthorizedException("유효하지 않은 토큰입니다.");
     }
   }
