@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  InternalServerErrorException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { Repository } from "typeorm";
@@ -105,7 +110,7 @@ export class AuthService {
       console.error("Google OAuth processing error:", error);
 
       if (axios.isAxiosError(error) && error.response?.status === 400) {
-        throw new BadRequestException("token_exchange_failed: Google 토큰 교환에 실패했습니다.");
+        throw new BadRequestException("Google 토큰 교환에 실패했습니다.");
       }
 
       // 이미 처리된 예외인 경우 그대로 throw
@@ -113,7 +118,7 @@ export class AuthService {
         throw error;
       }
 
-      throw new BadRequestException("OAuth 처리 중 알 수 없는 오류가 발생했습니다.");
+      throw new InternalServerErrorException("OAuth 처리 중 알 수 없는 오류가 발생했습니다.");
     }
   }
 
