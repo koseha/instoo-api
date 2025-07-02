@@ -185,21 +185,12 @@ export class AuthService {
       ],
     });
 
-    if (user) {
-      // 기존 사용자 정보 업데이트
-      user.nickname = googleUser.name;
-      user.profileImageUrl = googleUser.picture;
-      user.providerId = googleUser.id; // providerId가 없던 기존 사용자의 경우
-      user.provider = OAuthProvider.GOOGLE; // provider가 없던 기존 사용자의 경우
-      user.isActive = true;
-
-      await this.userRepository.save(user);
-    } else {
+    if (!user) {
       // 새 사용자 생성
       user = this.userRepository.create({
         email: googleUser.email,
         nickname: googleUser.name,
-        profileImageUrl: googleUser.picture,
+        // profileImageUrl: googleUser.picture,
         providerId: googleUser.id,
         provider: OAuthProvider.GOOGLE,
         role: UserRole.USER,

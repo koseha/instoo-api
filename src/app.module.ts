@@ -6,7 +6,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { getDatabaseConfig } from "./common/config/database.config";
 import { User } from "./users/entities/user.entity";
 import { UsersController } from "./users/controllers/users.controller";
-import { UsersService } from "./users/users.service";
+import { UsersService } from "./users/services/users.service";
 
 const nodeEnv = process.env.NODE_ENV || "development";
 
