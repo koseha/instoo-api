@@ -1,6 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { Request } from "express";
 import { UserRole } from "@/common/constants/user-role.enum";
 import { ROLES_KEY } from "../decorators/roles.decorator";
 import { AuthenticatedRequest } from "./jwt-auth.guard";
@@ -15,7 +14,8 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (!requiredRoles) {
+    // requiredRoles가 없거나 빈 배열이면 모두 허용
+    if (!requiredRoles || requiredRoles.length === 0) {
       return true;
     }
 
