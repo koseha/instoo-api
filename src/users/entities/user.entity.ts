@@ -1,14 +1,15 @@
 import { OAuthProvider } from "@/common/constants/oauth-provider.enum";
 import { UserRole } from "@/common/constants/user-role.enum";
 import { InstooBaseEntity } from "@/common/entities/base.entity";
-import { Column, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, Generated, Index } from "typeorm";
 
 // src/users/entities/user.entity.ts
 @Entity("users")
 @Index(["email"])
 @Index(["provider", "providerId"])
 export class User extends InstooBaseEntity {
-  @PrimaryGeneratedColumn("uuid")
+  @Column({ type: "uuid", unique: true })
+  @Generated("uuid")
   uuid: string;
 
   @Column({ unique: true })

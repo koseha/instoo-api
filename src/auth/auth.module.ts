@@ -23,6 +23,6 @@ import { AuthTestPageController } from "./controllers/auth-test-page.controller"
   ],
   providers: [AuthService],
   controllers: [AuthController, AuthTestPageController],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, TypeOrmModule],
 })
 export class AuthModule {}

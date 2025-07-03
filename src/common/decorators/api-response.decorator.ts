@@ -24,9 +24,54 @@ interface ApiInstooResponsesOptions {
 }
 
 /**
- * InstooApiResponse 성공 응답 데코레이터
+ * InstooApiResponse 성공 응답 데코레이터 (배열 지원)
  */
-export function ApiInstooResponse<T>(dataType: Type<T>, options: ApiInstooResponseOptions) {
+export function ApiInstooResponse<T>(
+  dataType: Type<T>,
+  options: ApiInstooResponseOptions & { isArray?: boolean },
+) {
+  const { status = 200, description, isArray = false } = options;
+
+  return applyDecorators(
+    ApiExtraModels(InstooApiResponse, dataType),
+    ApiResponse({
+      status,
+      description,
+      schema: {
+        type: "object",
+        properties: {
+          code: {
+            type: "number",
+            example: status,
+            description: "HTTP 상태 코드",
+          },
+          message: {
+            type: "string",
+            example: description,
+            description: "응답 메시지",
+            nullable: true,
+          },
+          content: isArray
+            ? {
+                type: "array",
+                items: { $ref: getSchemaPath(dataType) },
+                description: "응답 본문 (배열)",
+              }
+            : {
+                $ref: getSchemaPath(dataType),
+                description: "응답 본문",
+              },
+        },
+        required: ["code", "message", "content"],
+      },
+    }),
+  );
+}
+
+/**
+ * InstooApiResponse 배열 응답 전용 데코레이터
+ */
+export function ApiInstooArrayResponse<T>(dataType: Type<T>, options: ApiInstooResponseOptions) {
   const { status = 200, description } = options;
 
   return applyDecorators(
@@ -49,8 +94,9 @@ export function ApiInstooResponse<T>(dataType: Type<T>, options: ApiInstooRespon
             nullable: true,
           },
           content: {
-            $ref: getSchemaPath(dataType),
-            description: "응답 본문",
+            type: "array",
+            items: { $ref: getSchemaPath(dataType) },
+            description: "응답 본문 (배열)",
           },
         },
         required: ["code", "message", "content"],
@@ -98,12 +144,15 @@ export function ApiInstooErrorResponse(
 }
 
 /**
- * InstooApiResponse 성공 + 에러 응답들을 조합한 데코레이터
+ * InstooApiResponse 성공 + 에러 응답들을 조합한 데코레이터 (배열 지원)
  */
-export function ApiInstooResponses<T>(dataType: Type<T>, options: ApiInstooResponsesOptions) {
-  const { success, errors = [] } = options;
+export function ApiInstooResponses<T>(
+  dataType: Type<T>,
+  options: ApiInstooResponsesOptions & { isArray?: boolean },
+) {
+  const { success, errors = [], isArray = false } = options;
 
-  const decorators = [ApiInstooResponse(dataType, success)];
+  const decorators = [ApiInstooResponse(dataType, { ...success, isArray })];
 
   // 에러 응답들 추가
   errors.forEach((error) => {
@@ -213,4 +262,28 @@ export function ApiInstooSimpleResponse(options: ApiInstooResponseOptions) {
       },
     }),
   );
+}
+
+/**
+ * InstooApiResponse 성공 + 에러 응답들을 조합한 데코레이터 (응답 본문 없음)
+ */
+export function ApiInstooSimpleResponses(options: {
+  success: ApiInstooResponseOptions;
+  errors?: ApiInstooErrorResponseOptions[];
+}) {
+  const { success, errors = [] } = options;
+
+  const decorators = [ApiInstooSimpleResponse(success)];
+
+  // 에러 응답들 추가
+  errors.forEach((error) => {
+    decorators.push(
+      ApiInstooErrorResponse(error.status || 400, error.description || error.message, {
+        code: error.code,
+        message: error.message,
+      }),
+    );
+  });
+
+  return applyDecorators(...decorators);
 }

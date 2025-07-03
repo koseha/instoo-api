@@ -4,15 +4,13 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { getDatabaseConfig } from "./common/config/database.config";
-import { User } from "./users/entities/user.entity";
-import { UsersController } from "./users/controllers/users.controller";
-import { UsersService } from "./users/services/users.service";
+import { StreamersModule } from "./streamers/streamers.module";
+import { UsersModule } from "./users/users.module";
 
 const nodeEnv = process.env.NODE_ENV || "development";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [".env", `.env.${nodeEnv}`],
@@ -22,10 +20,10 @@ const nodeEnv = process.env.NODE_ENV || "development";
       inject: [ConfigService],
       useFactory: getDatabaseConfig,
     }),
+    UsersModule,
     HealthModule,
     AuthModule,
+    StreamersModule,
   ],
-  controllers: [UsersController],
-  providers: [UsersService],
 })
 export class AppModule {}
