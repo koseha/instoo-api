@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res } from "@nestjs/common";
+import { Controller, Get, Query, Res, Post, Body } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { AuthService } from "../services/auth.service";
 import { ConfigService } from "@nestjs/config";
@@ -107,5 +107,51 @@ export class AuthController {
         `${frontendErrorUrl}?error=${errorCode}&message=${encodeURIComponent(errorMessage)}`,
       );
     }
+  }
+
+  /**
+   * 리프레시 토큰을 통한 액세스 토큰 재발급
+   * POST /auth/v1/refresh
+   */
+  @Post("v1/refresh")
+  @ApiOperation({
+    summary: "리프레시 토큰으로 액세스 토큰 재발급",
+    description: "리프레시 토큰을 받아 새로운 액세스 토큰을 발급합니다.",
+  })
+  @ApiInstooResponse(Object, {
+    status: 200,
+    description: "토큰 재발급 성공",
+  })
+  @ApiInstooErrorResponse(400, "잘못된 요청", {
+    code: "BAD_REQUEST",
+    message: "리프레시 토큰이 유효하지 않습니다.",
+  })
+  async refreshToken(
+    @Body("refreshToken") refreshToken: string,
+  ): Promise<InstooApiResponse<{ accessToken: string; refreshToken?: string }>> {
+    const result = await this.authService.refreshToken(refreshToken);
+    return InstooApiResponse.success(result, "토큰이 성공적으로 재발급되었습니다.");
+  }
+
+  /**
+   * 로그아웃 - 리프레시 토큰 무효화
+   * POST /auth/v1/logout
+   */
+  @Post("v1/logout")
+  @ApiOperation({
+    summary: "로그아웃",
+    description: "리프레시 토큰을 무효화(블랙리스트 처리 등)합니다.",
+  })
+  @ApiInstooResponse(Object, {
+    status: 200,
+    description: "로그아웃 성공",
+  })
+  @ApiInstooErrorResponse(400, "잘못된 요청", {
+    code: "BAD_REQUEST",
+    message: "리프레시 토큰이 유효하지 않습니다.",
+  })
+  async logout(@Body("refreshToken") refreshToken: string): Promise<InstooApiResponse<null>> {
+    this.authService.invalidateToken(refreshToken);
+    return Promise.resolve(InstooApiResponse.success(null, "로그아웃 되었습니다."));
   }
 }

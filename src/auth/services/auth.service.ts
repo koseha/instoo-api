@@ -335,4 +335,15 @@ export class AuthService {
         return 7 * 24 * 60 * 60; // 기본 7일
     }
   }
+
+  /**
+   * 리프레시 토큰으로 새 액세스 토큰 발급 (컨트롤러용 래퍼)
+   */
+  async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+    const result = await this.refreshAccessToken(refreshToken);
+    return {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken!,
+    };
+  }
 }
