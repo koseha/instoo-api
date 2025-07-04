@@ -42,4 +42,7 @@ export class Streamer extends BaseAuditEntity {
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: "updatedBy" })
   updatedByUser?: User;
+
+  @Column({ type: "int", default: 0 })
+  followCount: number;
 }

@@ -92,15 +92,15 @@ export class QueryStreamersDto {
 
   @ApiProperty({
     description: "정렬 기준",
-    enum: ["id", "createdAt", "updatedAt", "name"],
+    enum: ["id", "createdAt", "updatedAt", "name", "popular"],
     required: false,
     default: "id",
     example: "createdAt",
   })
   @IsOptional()
-  @IsIn(["id", "createdAt", "updatedAt", "name"])
+  @IsIn(["id", "createdAt", "updatedAt", "name", "popular"])
   @Transform(({ value }: { value?: string }) => value || "id")
-  sortBy: "id" | "createdAt" | "updatedAt" | "name" = "id";
+  sortBy: "id" | "createdAt" | "updatedAt" | "name" | "popular" = "id";
 
   @ApiProperty({
     description: "정렬 순서",

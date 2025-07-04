@@ -147,7 +147,9 @@ export class StreamersService {
     }
 
     // 정렬
-    if (sortBy === "id") {
+    if (sortBy === "popular") {
+      queryBuilder.orderBy("streamer.followCount", "DESC").addOrderBy("streamer.id", sortOrder);
+    } else if (sortBy === "id") {
       queryBuilder.orderBy("streamer.id", sortOrder);
     } else {
       queryBuilder.orderBy(`streamer.${sortBy}`, sortOrder).addOrderBy("streamer.id", sortOrder);
@@ -175,8 +177,12 @@ export class StreamersService {
         cursorValue = lastItem.id.toString();
       } else if (sortBy === "createdAt" || sortBy === "updatedAt") {
         cursorValue = lastItem[sortBy].toISOString();
+      } else if (sortBy === "popular") {
+        cursorValue = lastItem.followCount.toString();
+      } else if (sortBy === "name") {
+        cursorValue = lastItem.name || "";
       } else {
-        cursorValue = lastItem[sortBy] || "";
+        cursorValue = "";
       }
 
       nextCursor = {
