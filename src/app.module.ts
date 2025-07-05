@@ -6,6 +6,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { getDatabaseConfig } from "./common/config/database.config";
 import { StreamersModule } from "./streamers/streamers.module";
 import { UsersModule } from "./users/users.module";
+import { SchedulesModule } from "./schedules/schedules.module";
 
 const nodeEnv = process.env.NODE_ENV || "development";
 
@@ -24,6 +25,7 @@ const nodeEnv = process.env.NODE_ENV || "development";
     HealthModule,
     AuthModule,
     StreamersModule,
+    SchedulesModule,
   ],
 })
 export class AppModule {}

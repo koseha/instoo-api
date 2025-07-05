@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { User } from "@/users/entities/user.entity";
 import { Streamer } from "@/streamers/entities/streamer.entity";
 import { StreamerPlatform } from "@/streamers/entities/streamer-platform.entity";
+import { Schedule } from "@/schedules/entities/schedule.entity";
 
 export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOptions => {
   const isProduction = configService.get<string>("NODE_ENV") === "production";
@@ -15,7 +16,7 @@ export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOp
     password: configService.get("DB_PASSWORD", ""),
     database: configService.get("DB_DATABASE", "instoo_local"),
     // entities: [__dirname + "/../**/*.entity{.ts,.js}"],
-    entities: [User, Streamer, StreamerPlatform],
+    entities: [User, Streamer, StreamerPlatform, Schedule],
 
     // migrations: [__dirname + "/../migrations/*{.ts,.js}"],
     synchronize: !isProduction, // 프로덕션에서는 false

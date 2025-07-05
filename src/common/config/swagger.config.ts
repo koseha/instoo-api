@@ -45,7 +45,7 @@ export function setupSwagger(app: INestApplication): void {
     .addTag("Authentication", "인증 관련 API")
     .addTag("Users", "사용자 관리 API")
     .addTag("Streamers", "방송인 관리 API")
-    .addTag("schedules", "일정 관리 API")
+    .addTag("Schedules", "일정 관리 API")
     .addTag("subscriptions", "구독 관리 API")
     .addTag("admin", "관리자 API")
     .addBearerAuth({
