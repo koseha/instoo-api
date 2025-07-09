@@ -31,6 +31,9 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  // 모든 라우트 앞에 /api 추가
+  app.setGlobalPrefix("api");
+
   // CORS 설정
   app.enableCors();
   // app.enableCors({
