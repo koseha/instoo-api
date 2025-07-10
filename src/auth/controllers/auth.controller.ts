@@ -11,7 +11,7 @@ import { OAuthUrlResponseDto } from "../dto/auth-response.dto";
 import { Response } from "express";
 
 @ApiTags("Authentication")
-@Controller("auth")
+@Controller()
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -20,9 +20,9 @@ export class AuthController {
 
   /**
    * OAuth 로그인 요청 - OAuth URL 생성
-   * GET /auth/google/login
+   * GET v1/auth/google/login
    */
-  @Get("v1/google/login")
+  @Get("v1/auth/google/login")
   @ApiOperation({
     summary: "Google OAuth 로그인 URL 생성",
     description: "프론트엔드에서 사용할 Google OAuth 인증 URL을 생성합니다.",
@@ -44,9 +44,9 @@ export class AuthController {
 
   /**
    * OAuth 콜백 처리 - Google에서 리다이렉트되는 엔드포인트
-   * GET /auth/v1/google/callback?code=AUTH_CODE
+   * GET v1/auth/google/callback?code=AUTH_CODE
    */
-  @Get("v1/google/callback")
+  @Get("v1/auth/google/callback")
   @ApiOperation({
     summary: "Google OAuth 콜백 처리",
     description: "Google OAuth 인증 완료 후 콜백을 처리하고 프론트엔드로 리다이렉트합니다.",
@@ -111,9 +111,9 @@ export class AuthController {
 
   /**
    * 리프레시 토큰을 통한 액세스 토큰 재발급
-   * POST /auth/v1/refresh
+   * POST v1/auth/refresh
    */
-  @Post("v1/refresh")
+  @Post("v1/auth/refresh")
   @ApiOperation({
     summary: "리프레시 토큰으로 액세스 토큰 재발급",
     description: "리프레시 토큰을 받아 새로운 액세스 토큰을 발급합니다.",
@@ -135,9 +135,9 @@ export class AuthController {
 
   /**
    * 로그아웃 - 리프레시 토큰 무효화
-   * POST /auth/v1/logout
+   * POST v1/auth/logout
    */
-  @Post("v1/logout")
+  @Post("v1/auth/logout")
   @ApiOperation({
     summary: "로그아웃",
     description: "리프레시 토큰을 무효화(블랙리스트 처리 등)합니다.",

@@ -13,18 +13,17 @@ import {
   HttpStatus,
   ParseIntPipe,
   Req,
-  BadRequestException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from "@nestjs/swagger";
 import { StreamersService } from "../services/streamers.service";
 import { CreateStreamerDto } from "../dto/create-streamer.dto";
 import { UpdateStreamerDto } from "../dto/update-streamer.dto";
-import { QueryStreamersDto } from "../dto/query-streamers.dto";
+import { GetStreamersDto } from "../dto/get-streamers.dto";
 import {
   StreamerResponseDto,
   PagedStreamerResponseDto,
-  StreamerAutocompleteDto,
   VerifyStreamerDto,
+  StreamerSearchDto,
 } from "../dto/streamer-response.dto";
 import { InstooApiResponse } from "@/common/dto/instoo-api-response.dto";
 import {
@@ -40,11 +39,14 @@ import { Roles } from "@/auth/decorators/roles.decorator";
 import { UserRole } from "@/common/constants/user-role.enum";
 
 @ApiTags("Streamers")
-@Controller("streamers")
+@Controller()
 export class StreamersController {
   constructor(private readonly streamersService: StreamersService) {}
 
-  @Post()
+  /**
+   *
+   */
+  @Post("v1/streamers")
   @ApiOperation({
     summary: "방송인 생성",
     description: "새로운 방송인을 생성합니다. 인증된 사용자만 생성할 수 있습니다.",
@@ -75,7 +77,10 @@ export class StreamersController {
     return InstooApiResponse.success(streamer, "방송인이 성공적으로 생성되었습니다.");
   }
 
-  @Get()
+  /**
+   *
+   */
+  @Post("v1/streamers/list")
   @ApiOperation({
     summary: "방송인 목록 조회",
     description: "무한 스크롤링을 지원하는 방송인 목록을 조회합니다.",
@@ -85,18 +90,21 @@ export class StreamersController {
     description: "방송인 목록 조회 성공",
   })
   async findAll(
-    @Query() query: QueryStreamersDto,
+    @Body() body: GetStreamersDto,
   ): Promise<InstooApiResponse<PagedStreamerResponseDto>> {
-    const result = await this.streamersService.findAll(query);
-    return InstooApiResponse.success(result, "방송인 목록을 성공적으로 조회했습니다.");
+    const result = await this.streamersService.findAll(body);
+    return InstooApiResponse.success(result);
   }
 
-  @Get("search/autocomplete")
+  /**
+   *
+   */
+  @Get("v1/streamers/search")
   @ApiOperation({
-    summary: "방송인 자동완성 검색",
-    description: "방송인 이름으로 자동완성 검색을 수행합니다.",
+    summary: "방송인 간편 검색 - 조회",
+    description: "방송인 이름으로 검색하여 해당하는 방송인들의 목록을 조회합니다.",
   })
-  @ApiInstooArrayResponse(StreamerAutocompleteDto, {
+  @ApiInstooArrayResponse(StreamerSearchDto, {
     status: 200,
     description: "자동완성 검색 성공",
   })
@@ -104,64 +112,17 @@ export class StreamersController {
     code: "BAD_REQUEST",
     message: "검색어는 최소 2글자 이상이어야 합니다.",
   })
-  async autocomplete(
-    @Query("q") query: string,
-    @Query("limit") limit: number = 10,
-  ): Promise<InstooApiResponse<StreamerAutocompleteDto[]>> {
-    if (!query || query.trim().length < 2) {
-      throw new BadRequestException("검색어는 최소 2글자 이상이어야 합니다.");
-    }
-
-    const searchQuery = new QueryStreamersDto();
-    searchQuery.name = query.trim();
-    searchQuery.limit = Math.min(limit, 10);
-    searchQuery.sortBy = "name";
-    searchQuery.sortOrder = "ASC";
-
-    const result = await this.streamersService.findAll(searchQuery);
-
-    const autocompleteData: StreamerAutocompleteDto[] = result.data.map((streamer) => ({
-      id: streamer.id,
-      uuid: streamer.uuid,
-      name: streamer.name,
-      profileImageUrl: streamer.profileImageUrl,
-      isVerified: streamer.isVerified,
-      platforms: streamer.platforms?.map((p) => p.platformName) || [],
-    }));
-
-    return InstooApiResponse.success(autocompleteData, "자동완성 결과를 성공적으로 조회했습니다.");
+  async search(@Query("qName") qName: string): Promise<InstooApiResponse<StreamerSearchDto[]>> {
+    const result = await this.streamersService.findAllByName(qName);
+    return InstooApiResponse.success(result);
   }
 
-  @Get(":id")
+  /**
+   *
+   */
+  @Get("v1/streamers/:uuid")
   @ApiOperation({
     summary: "방송인 상세 조회",
-    description: "ID로 특정 방송인의 상세 정보를 조회합니다.",
-  })
-  @ApiParam({ name: "id", description: "방송인 ID" })
-  @ApiInstooResponses(StreamerResponseDto, {
-    success: {
-      status: 200,
-      description: "방송인 조회 성공",
-    },
-    errors: [
-      {
-        status: 404,
-        description: "방송인을 찾을 수 없음",
-        code: "STREAMER_NOT_FOUND",
-        message: "해당 방송인을 찾을 수 없습니다.",
-      },
-    ],
-  })
-  async findOne(
-    @Param("id", ParseIntPipe) id: number,
-  ): Promise<InstooApiResponse<StreamerResponseDto>> {
-    const streamer = await this.streamersService.findOne(id);
-    return InstooApiResponse.success(streamer, "방송인 정보를 성공적으로 조회했습니다.");
-  }
-
-  @Get("uuid/:uuid")
-  @ApiOperation({
-    summary: "방송인 UUID로 조회",
     description: "UUID로 특정 방송인의 상세 정보를 조회합니다.",
   })
   @ApiParam({ name: "uuid", description: "방송인 UUID" })
@@ -179,18 +140,21 @@ export class StreamersController {
       },
     ],
   })
-  async findByUuid(@Param("uuid") uuid: string): Promise<InstooApiResponse<StreamerResponseDto>> {
+  async findOne(@Param("uuid") uuid: string): Promise<InstooApiResponse<StreamerResponseDto>> {
     const streamer = await this.streamersService.findByUuid(uuid);
     return InstooApiResponse.success(streamer, "방송인 정보를 성공적으로 조회했습니다.");
   }
 
-  @Patch(":id")
+  /**
+   *
+   */
+  @Patch("v1/streamers/:uuid")
   @ApiOperation({
     summary: "방송인 정보 수정",
     description:
       "방송인 정보를 수정합니다. 로그인한 사용자 누구나 수정할 수 있습니다. 충돌 방지를 위해 기존 방송인의 updatedAt 값을 lastUpdatedAt으로 전송해야 합니다.",
   })
-  @ApiParam({ name: "id", description: "방송인 ID" })
+  @ApiParam({ name: "uuid", description: "방송인 UUID" })
   @ApiInstooResponses(StreamerResponseDto, {
     success: {
       status: 200,
@@ -226,12 +190,12 @@ export class StreamersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   async update(
-    @Param("id", ParseIntPipe) id: number,
+    @Param("uuid") uuid: string,
     @Body() updateStreamerDto: UpdateStreamerDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<InstooApiResponse<StreamerResponseDto>> {
     const streamer = await this.streamersService.update(
-      id,
+      uuid,
       updateStreamerDto,
       req.user!.sub,
       req.user!.role,
@@ -239,9 +203,86 @@ export class StreamersController {
     return InstooApiResponse.success(streamer, "방송인 정보를 성공적으로 수정했습니다.");
   }
 
+  /**
+   *
+   */
+  @Patch("v1/streamers/:uuid/verify")
+  @ApiOperation({
+    summary: "방송인 인증 상태 변경",
+    description: "방송인의 인증 상태를 변경합니다. 관리자만 변경할 수 있습니다.",
+  })
+  @ApiParam({ name: "uuid", description: "방송인 UUID" })
+  @ApiInstooResponses(StreamerResponseDto, {
+    success: {
+      status: 200,
+      description: "방송인 인증 상태 변경 성공",
+    },
+    errors: [
+      {
+        status: 401,
+        description: "인증 실패",
+        code: "UNAUTHORIZED",
+        message: "인증이 필요합니다.",
+      },
+      {
+        status: 403,
+        description: "권한 없음",
+        code: "FORBIDDEN",
+        message: "관리자만 방송인 인증 상태를 변경할 수 있습니다.",
+      },
+      {
+        status: 404,
+        description: "방송인을 찾을 수 없음",
+        code: "STREAMER_NOT_FOUND",
+        message: "해당 방송인을 찾을 수 없습니다.",
+      },
+    ],
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  async verifyStreamer(
+    @Param("uuid") uuid: string,
+    @Body() verifyDto: VerifyStreamerDto,
+  ): Promise<InstooApiResponse<StreamerResponseDto>> {
+    const streamer = await this.streamersService.verifyStreamer(uuid, verifyDto.isVerified);
+    const message = verifyDto.isVerified
+      ? "방송인이 성공적으로 인증되었습니다."
+      : "방송인 인증이 해제되었습니다.";
+    return InstooApiResponse.success(streamer, message);
+  }
+
+  /**
+   *
+   */
+  @Get("uuid/:uuid")
+  @ApiOperation({
+    summary: "❌ 방송인 UUID로 조회",
+    description: "UUID로 특정 방송인의 상세 정보를 조회합니다.",
+  })
+  @ApiParam({ name: "uuid", description: "방송인 UUID" })
+  @ApiInstooResponses(StreamerResponseDto, {
+    success: {
+      status: 200,
+      description: "방송인 조회 성공",
+    },
+    errors: [
+      {
+        status: 404,
+        description: "방송인을 찾을 수 없음",
+        code: "STREAMER_NOT_FOUND",
+        message: "해당 방송인을 찾을 수 없습니다.",
+      },
+    ],
+  })
+  async findByUuid(@Param("uuid") uuid: string): Promise<InstooApiResponse<StreamerResponseDto>> {
+    const streamer = await this.streamersService.findByUuid(uuid);
+    return InstooApiResponse.success(streamer, "방송인 정보를 성공적으로 조회했습니다.");
+  }
+
   @Delete(":id")
   @ApiOperation({
-    summary: "방송인 삭제",
+    summary: "❌ 방송인 삭제",
     description: "방송인을 삭제합니다. 관리자만 삭제할 수 있습니다.",
   })
   @ApiParam({ name: "id", description: "방송인 ID" })
@@ -280,51 +321,5 @@ export class StreamersController {
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
     await this.streamersService.remove(id, req.user!.sub, req.user!.role);
-  }
-
-  @Patch(":id/verify")
-  @ApiOperation({
-    summary: "방송인 인증 상태 변경",
-    description: "방송인의 인증 상태를 변경합니다. 관리자만 변경할 수 있습니다.",
-  })
-  @ApiParam({ name: "id", description: "방송인 ID" })
-  @ApiInstooResponses(StreamerResponseDto, {
-    success: {
-      status: 200,
-      description: "방송인 인증 상태 변경 성공",
-    },
-    errors: [
-      {
-        status: 401,
-        description: "인증 실패",
-        code: "UNAUTHORIZED",
-        message: "인증이 필요합니다.",
-      },
-      {
-        status: 403,
-        description: "권한 없음",
-        code: "FORBIDDEN",
-        message: "관리자만 방송인 인증 상태를 변경할 수 있습니다.",
-      },
-      {
-        status: 404,
-        description: "방송인을 찾을 수 없음",
-        code: "STREAMER_NOT_FOUND",
-        message: "해당 방송인을 찾을 수 없습니다.",
-      },
-    ],
-  })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  async verifyStreamer(
-    @Param("id", ParseIntPipe) id: number,
-    @Body() verifyDto: VerifyStreamerDto,
-  ): Promise<InstooApiResponse<StreamerResponseDto>> {
-    const streamer = await this.streamersService.verifyStreamer(id, verifyDto.isVerified);
-    const message = verifyDto.isVerified
-      ? "방송인이 성공적으로 인증되었습니다."
-      : "방송인 인증이 해제되었습니다.";
-    return InstooApiResponse.success(streamer, message);
   }
 }

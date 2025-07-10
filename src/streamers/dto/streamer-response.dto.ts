@@ -186,22 +186,6 @@ export class StreamerPageCursorDto {
   value: string;
 }
 
-// 페이지 정보 DTO
-export class StreamerPageInfoDto {
-  @ApiProperty({
-    type: StreamerPageCursorDto,
-    nullable: true,
-    description: "다음 페이지 커서",
-  })
-  next: StreamerPageCursorDto | null;
-
-  @ApiProperty({
-    example: true,
-    description: "추가 데이터 존재 여부",
-  })
-  hasMore: boolean;
-}
-
 // 페이징된 방송인 응답 DTO
 export class PagedStreamerResponseDto {
   @ApiProperty({
@@ -211,10 +195,17 @@ export class PagedStreamerResponseDto {
   size: number;
 
   @ApiProperty({
-    type: StreamerPageInfoDto,
-    description: "페이지 정보",
+    example: 1,
+    description: "현재 페이지 번호 (0부터 시작 또는 1부터 시작은 정책에 따라)",
   })
-  page: StreamerPageInfoDto;
+  page: number;
+
+  @ApiProperty({
+    example: 100,
+    description: "전체 데이터 수",
+    required: false,
+  })
+  totalCount?: number;
 
   @ApiProperty({
     type: [StreamerResponseDto],
@@ -271,4 +262,36 @@ export class VerifyStreamerDto {
   })
   @IsBoolean()
   isVerified: boolean;
+}
+
+// 간편 검색 응답 DTO
+export class StreamerSearchDto {
+  @ApiProperty({
+    example: "550e8400-e29b-41d4-a716-446655440000",
+    description: "방송인 UUID",
+  })
+  uuid: string;
+
+  @ApiProperty({
+    example: "감스트",
+    description: "방송인 이름",
+  })
+  name: string;
+
+  @ApiProperty({
+    example: "https://example.com/profile.jpg",
+    description: "프로필 이미지 URL",
+    nullable: true,
+  })
+  profileImageUrl?: string;
+
+  static of(streamer: Streamer) {
+    const dto = new StreamerSearchDto();
+
+    dto.uuid = streamer.uuid;
+    dto.name = streamer.name;
+    dto.profileImageUrl = streamer.profileImageUrl;
+
+    return dto;
+  }
 }

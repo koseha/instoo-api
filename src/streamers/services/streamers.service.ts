@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -12,11 +13,11 @@ import { StreamerPlatform } from "../entities/streamer-platform.entity";
 import { User } from "@/users/entities/user.entity";
 import { CreateStreamerDto } from "../dto/create-streamer.dto";
 import { UpdateStreamerDto } from "../dto/update-streamer.dto";
-import { QueryStreamersDto } from "../dto/query-streamers.dto";
+import { GetStreamersDto } from "../dto/get-streamers.dto";
 import {
   StreamerResponseDto,
   PagedStreamerResponseDto,
-  StreamerPageCursorDto,
+  StreamerSearchDto,
 } from "../dto/streamer-response.dto";
 import { UserRole } from "@/common/constants/user-role.enum";
 
@@ -86,118 +87,98 @@ export class StreamersService {
   }
 
   /**
-   * 방송인 목록 조회 (무한 스크롤링)
+   * 방송인 목록 조회 - 간편 검색
    */
-  async findAll(query: QueryStreamersDto): Promise<PagedStreamerResponseDto> {
-    const {
-      name,
-      platform,
-      isVerified,
-      isActive,
-      cursorId,
-      cursorValue,
-      limit = 20,
-      sortBy = "id",
-      sortOrder = "DESC",
-    } = query;
+  async findAllByName(qName: string): Promise<StreamerSearchDto[]> {
+    if (!qName || qName.trim().length < 2)
+      throw new BadRequestException("검색어는 최소 2글자 이상이어야 합니다.");
 
+    const queryBuilder = this.streamerRepository
+      .createQueryBuilder("streamer")
+      .leftJoinAndSelect("streamer.platforms", "platform")
+      .where("streamer.isActive = :isActive", { isActive: true })
+      .andWhere("streamer.name ILIKE :name", {
+        name: `%${qName.trim()}%`,
+      })
+      .limit(5);
+
+    const streamers = await queryBuilder.getMany();
+    return streamers.map((m) => StreamerSearchDto.of(m));
+  }
+
+  /**
+   * 방송인 목록 조회
+   * - 페이지네이션
+   */
+  async findAll(body: GetStreamersDto): Promise<PagedStreamerResponseDto> {
+    const { isVerified, platforms, followCount, createdAt, updatedAt, verifiedAt, page, size } =
+      body;
+
+    // 쿼리 빌더 생성
     const queryBuilder = this.streamerRepository
       .createQueryBuilder("streamer")
       .leftJoinAndSelect("streamer.platforms", "platform")
       .leftJoinAndSelect("streamer.createdByUser", "createdByUser")
       .leftJoinAndSelect("streamer.updatedByUser", "updatedByUser")
-      .where("streamer.isActive = :isActive", { isActive: isActive ?? true });
+      .where("streamer.isActive = :isActive", { isActive: true });
 
-    // 검색 조건 추가
-    if (name?.trim()) {
-      queryBuilder.andWhere("streamer.name ILIKE :name", {
-        name: `%${name.trim()}%`,
-      });
-    }
-
-    if (platform?.trim()) {
-      queryBuilder.andWhere("platform.platformName = :platform", {
-        platform: platform.trim(),
-      });
-    }
-
+    // 인증 상태 필터링
     if (isVerified !== undefined) {
       queryBuilder.andWhere("streamer.isVerified = :isVerified", { isVerified });
     }
 
-    // Cursor-based pagination
-    if (cursorId && cursorValue) {
-      const operator = sortOrder === "DESC" ? "<" : ">";
-
-      if (sortBy === "id") {
-        queryBuilder.andWhere(`streamer.id ${operator} :cursorId`, { cursorId });
-      } else if (sortBy === "createdAt" || sortBy === "updatedAt") {
-        // 날짜 + ID 복합 정렬
-        queryBuilder.andWhere(
-          `(streamer.${sortBy} ${operator} :cursorValue OR (streamer.${sortBy} = :cursorValue AND streamer.id ${operator} :cursorId))`,
-          { cursorValue: new Date(cursorValue), cursorId },
-        );
-      } else if (sortBy === "name") {
-        // 이름 + ID 복합 정렬
-        queryBuilder.andWhere(
-          `(streamer.name ${operator} :cursorValue OR (streamer.name = :cursorValue AND streamer.id ${operator} :cursorId))`,
-          { cursorValue, cursorId },
-        );
-      }
+    // 플랫폼 필터링
+    if (platforms && platforms.length > 0) {
+      queryBuilder.andWhere("platform.platformName IN (:...platforms)", { platforms });
     }
 
-    // 정렬
-    if (sortBy === "popular") {
-      queryBuilder.orderBy("streamer.followCount", "DESC").addOrderBy("streamer.id", sortOrder);
-    } else if (sortBy === "id") {
-      queryBuilder.orderBy("streamer.id", sortOrder);
-    } else {
-      queryBuilder.orderBy(`streamer.${sortBy}`, sortOrder).addOrderBy("streamer.id", sortOrder);
+    // 정렬 조건 적용
+    const orderConditions: { [key: string]: "ASC" | "DESC" } = {};
+
+    if (followCount) {
+      orderConditions["streamer.followCount"] = followCount.toUpperCase() as "ASC" | "DESC";
     }
 
-    queryBuilder.take(limit + 1);
-
-    const streamers = await queryBuilder.getMany();
-
-    if (!streamers) throw new NotFoundException("등록된 방송인 목록이 존재하지 않습니다.");
-
-    // hasMore 확인
-    const hasMore = streamers.length > limit;
-    if (hasMore) {
-      streamers.pop();
+    if (createdAt) {
+      orderConditions["streamer.createdAt"] = createdAt.toUpperCase() as "ASC" | "DESC";
     }
 
-    // nextCursor 설정
-    let nextCursor: StreamerPageCursorDto | null = null;
-    if (hasMore && streamers.length > 0) {
-      const lastItem = streamers[streamers.length - 1];
-      let cursorValue: string;
-
-      if (sortBy === "id") {
-        cursorValue = lastItem.id.toString();
-      } else if (sortBy === "createdAt" || sortBy === "updatedAt") {
-        cursorValue = lastItem[sortBy].toISOString();
-      } else if (sortBy === "popular") {
-        cursorValue = lastItem.followCount.toString();
-      } else if (sortBy === "name") {
-        cursorValue = lastItem.name || "";
-      } else {
-        cursorValue = "";
-      }
-
-      nextCursor = {
-        id: lastItem.id,
-        value: cursorValue,
-      };
+    if (updatedAt) {
+      orderConditions["streamer.updatedAt"] = updatedAt.toUpperCase() as "ASC" | "DESC";
     }
+
+    if (verifiedAt) {
+      // verifiedAt는 별도 컬럼이 없으므로 updatedAt으로 대체하거나
+      // 인증된 방송인의 updatedAt으로 처리
+      queryBuilder.andWhere("streamer.isVerified = :verified", { verified: true });
+      orderConditions["streamer.updatedAt"] = verifiedAt.toUpperCase() as "ASC" | "DESC";
+    }
+
+    // 정렬 조건이 없으면 기본 정렬 적용
+    if (Object.keys(orderConditions).length === 0) {
+      orderConditions["streamer.createdAt"] = "DESC";
+    }
+
+    // 정렬 조건 적용
+    Object.entries(orderConditions).forEach(([column, direction]) => {
+      queryBuilder.addOrderBy(column, direction);
+    });
+
+    // 페이지네이션 적용
+    const skip = (page - 1) * size;
+    queryBuilder.skip(skip).take(size);
+
+    // 데이터 조회
+    const [streamers, totalCount] = await queryBuilder.getManyAndCount();
+
+    // DTO 변환
+    const data = streamers.map((streamer) => StreamerResponseDto.of(streamer));
 
     return {
-      size: limit,
-      page: {
-        next: nextCursor,
-        hasMore,
-      },
-      data: streamers.map((streamer) => this.toResponseDto(streamer)),
+      size,
+      page,
+      totalCount,
+      data,
     };
   }
 
@@ -237,7 +218,7 @@ export class StreamersService {
    * 방송인 정보 수정 (충돌 방지 기능 포함)
    */
   async update(
-    id: number,
+    uuid: string,
     updateStreamerDto: UpdateStreamerDto,
     userUuid: string,
     _userRole: UserRole,
@@ -252,12 +233,12 @@ export class StreamersService {
 
     // 기존 방송인 정보 조회
     const streamer = await this.streamerRepository.findOne({
-      where: { id, isActive: true },
+      where: { uuid, isActive: true },
       relations: ["platforms"],
     });
 
     if (!streamer) {
-      throw new NotFoundException(`방송인을 찾을 수 없습니다. (ID: ${id})`);
+      throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
     }
 
     // 충돌 방지: updatedAt 체크
@@ -275,7 +256,7 @@ export class StreamersService {
       const existingStreamer = await this.streamerRepository.findOne({
         where: { name: updateStreamerDto.name, isActive: true },
       });
-      if (existingStreamer && existingStreamer.id !== id) {
+      if (existingStreamer && existingStreamer.uuid !== uuid) {
         throw new ConflictException(`방송인 이름 "${updateStreamerDto.name}"이 이미 존재합니다.`);
       }
     }
@@ -311,7 +292,7 @@ export class StreamersService {
       }
     }
 
-    return this.findOne(id);
+    return this.findByUuid(uuid);
   }
 
   /**
@@ -346,19 +327,19 @@ export class StreamersService {
   /**
    * 방송인 인증 상태 변경 (관리자만 가능)
    */
-  async verifyStreamer(id: number, isVerified: boolean): Promise<StreamerResponseDto> {
+  async verifyStreamer(uuid: string, isVerified: boolean): Promise<StreamerResponseDto> {
     const streamer = await this.streamerRepository.findOne({
-      where: { id, isActive: true },
+      where: { uuid, isActive: true },
     });
 
     if (!streamer) {
-      throw new NotFoundException(`방송인을 찾을 수 없습니다. (ID: ${id})`);
+      throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
     }
 
     streamer.isVerified = isVerified;
     await this.streamerRepository.save(streamer);
 
-    return this.findOne(id);
+    return this.findByUuid(uuid);
   }
 
   /**

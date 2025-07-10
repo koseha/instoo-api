@@ -15,11 +15,11 @@ import { UsersService } from "../services/users.service";
 import { UpdateProfileDto } from "../dto/update-profile.dto";
 
 @ApiTags("Users")
-@Controller("users")
+@Controller()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Get("me")
+  @Get("v1/users/me")
   @ApiOperation({
     summary: "내 정보 조회",
     description: "현재 로그인한 사용자의 정보를 조회합니다.",
@@ -44,7 +44,7 @@ export class UsersController {
     return InstooApiResponse.success(user, "내 정보를 성공적으로 조회했습니다.");
   }
 
-  @Get(":uuid")
+  @Get("v1/users/:uuid")
   @ApiOperation({
     summary: "사용자 상세 조회",
     description: "ID로 특정 사용자의 상세 정보를 조회합니다.",
@@ -83,7 +83,7 @@ export class UsersController {
     return InstooApiResponse.success(user, "사용자 정보를 성공적으로 조회했습니다.");
   }
 
-  @Patch("me")
+  @Patch("v1/users/me")
   @ApiOperation({
     summary: "내 닉네임 수정",
     description: "현재 로그인한 사용자의 닉네임을 수정합니다.",
