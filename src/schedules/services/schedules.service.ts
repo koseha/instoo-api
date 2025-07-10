@@ -5,6 +5,7 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
+  InternalServerErrorException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Schedule } from "../entities/schedule.entity";
@@ -39,68 +40,148 @@ export class SchedulesService {
     createScheduleDto: CreateScheduleDto,
     userUuid: string,
   ): Promise<ScheduleResponseDto> {
-    // 사용자 조회
+    // 1. 사용자 조회
     const user = await this.userRepository.findOne({
-      where: { uuid: userUuid, isActive: true },
+      where: { uuid: userUuid },
     });
+
     if (!user) {
       throw new NotFoundException("사용자를 찾을 수 없습니다.");
     }
 
-    // 방송인 조회 및 검증 상태 확인
+    // 2. 스트리머 조회
     const streamer = await this.streamerRepository.findOne({
-      where: { uuid: createScheduleDto.streamerUuid, isActive: true },
+      where: { uuid: createScheduleDto.streamerUuid },
     });
+
     if (!streamer) {
-      throw new NotFoundException("방송인을 찾을 수 없습니다.");
-    }
-    if (!streamer.isVerified) {
-      throw new BadRequestException("검증되지 않은 방송인은 일정을 등록할 수 없습니다.");
+      throw new NotFoundException("스트리머를 찾을 수 없습니다.");
     }
 
-    // 같은 날짜에 이미 일정이 있는지 확인
-    const existingSchedule = await this.scheduleRepository.findOne({
-      where: {
-        streamerUuid: createScheduleDto.streamerUuid,
-        scheduleDate: new Date(createScheduleDto.scheduleDate),
-      },
-    });
-    if (existingSchedule) {
-      throw new ConflictException(
-        `${createScheduleDto.scheduleDate} 날짜에 이미 "${streamer.name}"의 일정이 존재합니다.`,
-      );
-    }
-
-    // 과거 날짜 등록 방지
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // 3. 날짜 변환
     const scheduleDate = new Date(createScheduleDto.scheduleDate);
-    if (scheduleDate < today) {
-      throw new BadRequestException("과거 날짜의 일정은 등록할 수 없습니다.");
+    let startTime: Date | undefined;
+
+    if (
+      createScheduleDto.startTime &&
+      !createScheduleDto.isTimeUndecided &&
+      !createScheduleDto.isBreak
+    ) {
+      startTime = new Date(createScheduleDto.startTime);
     }
 
-    // 일정 데이터 생성
-    const scheduleData = {
+    // 4. 비즈니스 로직 검증
+    await this.validateScheduleCreation(
+      streamer.id,
+      scheduleDate,
+      startTime,
+      createScheduleDto.isTimeUndecided || false,
+      createScheduleDto.isBreak || false,
+    );
+
+    // 5. 일정 생성
+    const schedule = this.scheduleRepository.create({
       title: createScheduleDto.title,
-      scheduleDate: new Date(createScheduleDto.scheduleDate),
+      scheduleDate,
+      startTime,
       isTimeUndecided: createScheduleDto.isTimeUndecided || false,
       isBreak: createScheduleDto.isBreak || false,
       description: createScheduleDto.description,
-      streamerUuid: createScheduleDto.streamerUuid,
-      createdBy: user.id,
-      updatedBy: user.id,
-      startTime: undefined as Date | undefined,
-    };
+      streamer,
+      createdByUser: user,
+      updatedByUser: user,
+      version: 1,
+    });
 
-    // startTime 처리
-    if (!scheduleData.isBreak && !scheduleData.isTimeUndecided && createScheduleDto.startTime) {
-      scheduleData.startTime = new Date(createScheduleDto.startTime);
-    }
-
-    const schedule = this.scheduleRepository.create(scheduleData);
+    // 6. 저장
     const savedSchedule = await this.scheduleRepository.save(schedule);
 
-    return this.findOne(savedSchedule.id);
+    // 7. 저장된 일정 조회 (관계 데이터 포함)
+    const result = await this.scheduleRepository.findOne({
+      where: { id: savedSchedule.id },
+      relations: ["streamer", "createdByUser", "updatedByUser"],
+    });
+
+    if (!result) {
+      throw new InternalServerErrorException("일정 생성 중 오류가 발생했습니다.");
+    }
+
+    // 8. DTO 변환 후 반환
+    return ScheduleResponseDto.of(result);
+  }
+
+  /**
+   * 일정 생성 시 비즈니스 로직 검증
+   */
+  private async validateScheduleCreation(
+    streamerId: number,
+    scheduleDate: Date,
+    startTime: Date | undefined,
+    isTimeUndecided: boolean,
+    isBreak: boolean,
+  ): Promise<void> {
+    // 해당 방송일의 기존 일정들 조회
+    const existingSchedules = await this.scheduleRepository.find({
+      where: {
+        streamer: { id: streamerId },
+        scheduleDate: scheduleDate,
+      },
+      order: { startTime: "ASC" },
+    });
+
+    // 휴방 관련 검증
+    if (isBreak) {
+      // 해당 방송일에 다른 일정이 존재하면 휴방 일정 등록 불가
+      if (existingSchedules.length > 0) {
+        throw new ConflictException(
+          "해당 방송일에 이미 다른 일정이 존재하여 휴방 일정을 등록할 수 없습니다.",
+        );
+      }
+    } else {
+      // 휴방이 아닌 경우, 해당 방송일에 휴방 일정이 있으면 등록 불가
+      const hasBreakSchedule = existingSchedules.some((schedule) => schedule.isBreak);
+      if (hasBreakSchedule) {
+        throw new ConflictException(
+          "해당 방송일에 휴방 일정이 존재하여 다른 일정을 등록할 수 없습니다.",
+        );
+      }
+    }
+
+    // 방송일 기준 최대 2개 일정 제한
+    if (existingSchedules.length >= 2) {
+      throw new ConflictException("방송일 기준으로 최대 2개의 일정만 등록할 수 있습니다.");
+    }
+
+    // 시간 미정 관련 검증
+    if (isTimeUndecided) {
+      const timeUndecidedCount = existingSchedules.filter(
+        (schedule) => schedule.isTimeUndecided,
+      ).length;
+      if (timeUndecidedCount >= 2) {
+        throw new ConflictException("해당 방송일에 시간 미정 일정은 2개 이상 등록할 수 없습니다.");
+      }
+    }
+
+    // 시작 시간 중복 검증 (시간이 지정된 경우만)
+    if (startTime && !isTimeUndecided && !isBreak) {
+      for (const existingSchedule of existingSchedules) {
+        if (
+          existingSchedule.startTime &&
+          !existingSchedule.isTimeUndecided &&
+          !existingSchedule.isBreak
+        ) {
+          const timeDiff = Math.abs(startTime.getTime() - existingSchedule.startTime.getTime());
+          const hoursDiff = timeDiff / (1000 * 60 * 60); // 밀리초를 시간으로 변환
+
+          // ±2시간 이내에 다른 일정이 있으면 등록 불가
+          if (hoursDiff < 2) {
+            throw new ConflictException(
+              "시작 시간 기준 ±2시간 이내에 다른 일정이 존재하여 등록할 수 없습니다.",
+            );
+          }
+        }
+      }
+    }
   }
 
   /**

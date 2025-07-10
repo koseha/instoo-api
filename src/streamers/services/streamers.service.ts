@@ -114,6 +114,8 @@ export class StreamersService {
     const { isVerified, platforms, followCount, createdAt, updatedAt, verifiedAt, page, size } =
       body;
 
+    console.log(body);
+
     // 쿼리 빌더 생성
     const queryBuilder = this.streamerRepository
       .createQueryBuilder("streamer")
@@ -150,7 +152,7 @@ export class StreamersService {
     if (verifiedAt) {
       // verifiedAt는 별도 컬럼이 없으므로 updatedAt으로 대체하거나
       // 인증된 방송인의 updatedAt으로 처리
-      queryBuilder.andWhere("streamer.isVerified = :verified", { verified: true });
+      queryBuilder.andWhere("streamer.isVerified = :verified", { verified: isVerified ?? true });
       orderConditions["streamer.updatedAt"] = verifiedAt.toUpperCase() as "ASC" | "DESC";
     }
 

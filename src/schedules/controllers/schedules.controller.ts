@@ -33,11 +33,14 @@ import { Roles } from "@/auth/decorators/roles.decorator";
 import { UserRole } from "@/common/constants/user-role.enum";
 
 @ApiTags("Schedules")
-@Controller("schedules")
+@Controller()
 export class SchedulesController {
   constructor(private readonly schedulesService: SchedulesService) {}
 
-  @Post()
+  /**
+   *
+   */
+  @Post("v1/schedules")
   @ApiOperation({
     summary: "일정 등록",
     description: "새로운 일정을 등록합니다. 검증된 방송인만 일정을 등록할 수 있습니다.",
@@ -69,9 +72,12 @@ export class SchedulesController {
     @Req() req: AuthenticatedRequest,
   ): Promise<InstooApiResponse<ScheduleResponseDto>> {
     const schedule = await this.schedulesService.create(createScheduleDto, req.user!.sub);
-    return InstooApiResponse.success(schedule, "일정이 성공적으로 등록되었습니다.");
+    return InstooApiResponse.success(schedule);
   }
 
+  /**
+   *
+   */
   @Get()
   @ApiOperation({
     summary: "일정 목록 조회",
@@ -88,6 +94,9 @@ export class SchedulesController {
     return InstooApiResponse.success(result, "일정 목록을 성공적으로 조회했습니다.");
   }
 
+  /**
+   *
+   */
   @Get(":id")
   @ApiOperation({
     summary: "일정 상세 조회",
@@ -115,31 +124,9 @@ export class SchedulesController {
     return InstooApiResponse.success(schedule, "일정 정보를 성공적으로 조회했습니다.");
   }
 
-  @Get("uuid/:uuid")
-  @ApiOperation({
-    summary: "일정 UUID로 조회",
-    description: "UUID로 특정 일정의 상세 정보를 조회합니다.",
-  })
-  @ApiParam({ name: "uuid", description: "일정 UUID" })
-  @ApiInstooResponses(ScheduleResponseDto, {
-    success: {
-      status: 200,
-      description: "일정 조회 성공",
-    },
-    errors: [
-      {
-        status: 404,
-        description: "일정을 찾을 수 없음",
-        code: "SCHEDULE_NOT_FOUND",
-        message: "해당 일정을 찾을 수 없습니다.",
-      },
-    ],
-  })
-  async findByUuid(@Param("uuid") uuid: string): Promise<InstooApiResponse<ScheduleResponseDto>> {
-    const schedule = await this.schedulesService.findByUuid(uuid);
-    return InstooApiResponse.success(schedule, "일정 정보를 성공적으로 조회했습니다.");
-  }
-
+  /**
+   *
+   */
   @Patch(":id")
   @ApiOperation({
     summary: "일정 정보 수정",
@@ -201,6 +188,9 @@ export class SchedulesController {
     return InstooApiResponse.success(schedule, "일정 정보를 성공적으로 수정했습니다.");
   }
 
+  /**
+   *
+   */
   @Delete(":id")
   @ApiOperation({
     summary: "일정 삭제",
@@ -242,5 +232,33 @@ export class SchedulesController {
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
     await this.schedulesService.remove(id, req.user!.sub, req.user!.role);
+  }
+
+  /**
+   *
+   */
+  @Get("uuid/:uuid")
+  @ApiOperation({
+    summary: "❌ 일정 UUID로 조회",
+    description: "UUID로 특정 일정의 상세 정보를 조회합니다.",
+  })
+  @ApiParam({ name: "uuid", description: "일정 UUID" })
+  @ApiInstooResponses(ScheduleResponseDto, {
+    success: {
+      status: 200,
+      description: "일정 조회 성공",
+    },
+    errors: [
+      {
+        status: 404,
+        description: "일정을 찾을 수 없음",
+        code: "SCHEDULE_NOT_FOUND",
+        message: "해당 일정을 찾을 수 없습니다.",
+      },
+    ],
+  })
+  async findByUuid(@Param("uuid") uuid: string): Promise<InstooApiResponse<ScheduleResponseDto>> {
+    const schedule = await this.schedulesService.findByUuid(uuid);
+    return InstooApiResponse.success(schedule, "일정 정보를 성공적으로 조회했습니다.");
   }
 }

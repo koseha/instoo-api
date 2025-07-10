@@ -6,7 +6,7 @@ import { AuthService } from "../services/auth.service";
 import { UserRole } from "@/common/constants/user-role.enum";
 
 export interface JwtPayload {
-  sub: string; // user id
+  sub: string; // user uuid
   nickname: string;
   role: UserRole;
   iat?: number;

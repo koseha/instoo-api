@@ -16,13 +16,17 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractTokenFromHeader(request);
 
+    console.log(request);
+    console.log(token);
+
     if (!token) {
       throw new UnauthorizedException("토큰이 제공되지 않았습니다.");
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
-      // const user = await this.usersService.findByUuid(payload.sub);
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+        secret: process.env.JWT_SECRET, // 명시적으로 시크릿 지정
+      });
 
       if (!payload) {
         throw new InvalidUserException();
