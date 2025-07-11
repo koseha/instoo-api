@@ -81,10 +81,12 @@ export class StreamersService {
 
       const savedStreamer = await streamerRepository.save(streamer);
 
-      console.log(savedStreamer);
-
       // 생성 이력 기록
-      await this.streamerHistoryService.recordCreate(savedStreamer, userUuid);
+      await this.streamerHistoryService.recordCreateWithTransaction(
+        manager,
+        savedStreamer,
+        userUuid,
+      );
 
       // 트랜잭션 내에서 결과 조회
       return this.findOneInTransaction(savedStreamer.uuid, manager);
@@ -260,6 +262,7 @@ export class StreamersService {
         where: { uuid, isActive: true },
         relations: ["platforms"],
       });
+      const previousStreamer = Object.assign(new Streamer(), existingStreamer);
 
       if (!existingStreamer) {
         throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
@@ -296,43 +299,34 @@ export class StreamersService {
 
       await transactionalEntityManager.save(Streamer, existingStreamer);
 
-      // 플랫폼 정보 업데이트
+      // 플랫폼 정보 업데이트 (기존 완전 삭제 → 신규 저장)
       if (updateStreamerDto.platforms !== undefined) {
-        // 기존 플랫폼 비활성화
-        await transactionalEntityManager.update(
-          StreamerPlatform,
-          { streamerUuid: existingStreamer.uuid },
-          { isActive: false },
-        );
+        // 기존 플랫폼 완전 삭제 (하드 delete)
+        await transactionalEntityManager.delete(StreamerPlatform, {
+          streamerUuid: existingStreamer.uuid,
+        });
 
         // 새 플랫폼 추가
         if (updateStreamerDto.platforms.length > 0) {
-          const platforms = updateStreamerDto.platforms.map((platformDto) =>
+          const newPlatforms = updateStreamerDto.platforms.map((platformDto) =>
             transactionalEntityManager.create(StreamerPlatform, {
               platformName: platformDto.platformName,
               channelUrl: platformDto.channelUrl,
               streamerUuid: existingStreamer.uuid,
             }),
           );
-          await transactionalEntityManager.save(StreamerPlatform, platforms);
+          await transactionalEntityManager.save(StreamerPlatform, newPlatforms);
         }
       }
 
-      // 수정된 데이터 다시 조회 (이력 기록용)
-      const updatedStreamer = await transactionalEntityManager.findOne(Streamer, {
-        where: { uuid },
-        relations: ["platforms"],
-      });
-
-      // 수정 이력 기록 (트랜잭션 내에서)
+      // 수정 이력 기록
       await this.streamerHistoryService.recordUpdateWithTransaction(
         transactionalEntityManager,
-        updatedStreamer!,
         existingStreamer,
+        previousStreamer,
         userUuid,
       );
 
-      // 트랜잭션 완료 후 최종 결과 반환
       return this.findByUuid(uuid);
     });
   }

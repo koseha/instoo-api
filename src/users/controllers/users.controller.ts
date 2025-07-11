@@ -46,7 +46,7 @@ export class UsersController {
 
   @Get("v1/users/:uuid")
   @ApiOperation({
-    summary: "사용자 상세 조회",
+    summary: "[관리자] 사용자 상세 조회",
     description: "ID로 특정 사용자의 상세 정보를 조회합니다.",
   })
   @ApiInstooResponses(UserInfoDto, {

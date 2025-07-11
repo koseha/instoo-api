@@ -10,9 +10,6 @@ import { HistoryType } from "@/common/constants/history-type.enum";
 @Index(["createdAt"])
 @Index(["modifiedBy"])
 export class StreamerHistory extends InstooBaseEntity {
-  @Column({ type: "uuid" })
-  streamerUuid: string;
-
   @Column({
     type: "enum",
     enum: HistoryType,
@@ -32,6 +29,9 @@ export class StreamerHistory extends InstooBaseEntity {
     comment: "변경 후 데이터 (DELETE 액션의 경우 삭제된 데이터)",
   })
   currentData?: SerializedStreamerData;
+
+  @Column({ type: "uuid" })
+  streamerUuid: string;
 
   @Column({ type: "uuid" })
   modifiedBy: string;

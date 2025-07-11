@@ -1,8 +1,9 @@
 // src/streamers/dto/update-streamer.dto.ts
 import { PartialType } from "@nestjs/mapped-types";
-import { CreateStreamerDto } from "./create-streamer.dto";
+import { CreateStreamerDto, PlatformDto } from "./create-streamer.dto";
 import { ApiProperty } from "@nestjs/swagger";
-import { IsDateString } from "class-validator";
+import { IsArray, IsDateString, IsOptional, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
 
 export class UpdateStreamerDto extends PartialType(CreateStreamerDto) {
   @ApiProperty({
@@ -27,13 +28,16 @@ export class UpdateStreamerDto extends PartialType(CreateStreamerDto) {
   description?: string;
 
   @ApiProperty({
-    description: "플랫폼 목록 (전체 교체)",
+    type: [PlatformDto],
+    description: "플랫폼 목록",
     required: false,
+    maxItems: 10,
   })
-  platforms?: Array<{
-    platformName: string;
-    channelUrl?: string;
-  }>;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PlatformDto)
+  @IsOptional()
+  platforms?: PlatformDto[];
 
   @ApiProperty({
     example: "2025-07-03T10:00:00.000Z",

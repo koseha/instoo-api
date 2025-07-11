@@ -26,6 +26,21 @@ export class StreamerHistoryService {
     return await this.streamerHistoryRepository.save(history);
   }
 
+  async recordCreateWithTransaction(
+    entityManager: EntityManager,
+    streamer: Streamer,
+    modifiedBy: string,
+  ): Promise<StreamerHistory> {
+    const history = entityManager.create(StreamerHistory, {
+      streamerUuid: streamer.uuid,
+      action: HistoryType.CREATE,
+      currentData: streamer.toSerializedData(),
+      modifiedBy,
+    });
+
+    return await entityManager.save(StreamerHistory, history);
+  }
+
   /**
    * Streamer 수정 이력 기록
    */

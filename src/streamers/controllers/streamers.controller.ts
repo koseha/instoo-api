@@ -208,7 +208,7 @@ export class StreamersController {
    */
   @Patch("v1/streamers/:uuid/verify")
   @ApiOperation({
-    summary: "방송인 인증 상태 변경",
+    summary: "[관리자] 방송인 인증 상태 변경",
     description: "방송인의 인증 상태를 변경합니다. 관리자만 변경할 수 있습니다.",
   })
   @ApiParam({ name: "uuid", description: "방송인 UUID" })
