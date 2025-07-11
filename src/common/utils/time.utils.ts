@@ -17,6 +17,12 @@ export class TimeUtils {
     return result;
   }
 
+  // UTC → KST 시간만 (HH:mm 형식)
+  static toKstTimeOnly(utcDate: Date): string {
+    const kstDate = toZonedTime(utcDate, this.KST);
+    return format(kstDate, "HH:mm");
+  }
+
   // KST 날짜 범위를 UTC 시간 범위로 변환
   static getDateRangeInUtc(startDate: string, endDate: string): { startTime: Date; endTime: Date } {
     // KST 기준 startDate 00:00:00 → UTC
@@ -31,5 +37,17 @@ export class TimeUtils {
       startTime: utcStartTime,
       endTime: utcEndTime,
     };
+  }
+
+  // 날짜 문자열을 KST 기준 Date 객체로 변환
+  static parseKstDate(dateString: string): Date {
+    const kstDateString = `${dateString}T00:00:00+09:00`;
+    return this.toUtc(kstDateString);
+  }
+
+  // UTC Date를 KST 날짜 문자열로 변환 (YYYY-MM-DD)
+  static toKstDateString(utcDate: Date): string {
+    const kstDate = toZonedTime(utcDate, this.KST);
+    return format(kstDate, "yyyy-MM-dd");
   }
 }

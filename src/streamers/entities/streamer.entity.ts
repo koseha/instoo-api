@@ -34,13 +34,18 @@ export class Streamer extends BaseAuditEntity {
   })
   platforms: StreamerPlatform[];
 
-  // User 관계 추가
+  @Column({ type: "uuid" })
+  createdByUserUuid: string;
+
+  @Column({ type: "uuid" })
+  updatedByUserUuid: string;
+
   @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: "createdBy" })
+  @JoinColumn({ name: "createdByUserUuid", referencedColumnName: "uuid" })
   createdByUser?: User;
 
   @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: "updatedBy" })
+  @JoinColumn({ name: "updatedByUserUuid", referencedColumnName: "uuid" })
   updatedByUser?: User;
 
   @Column({ type: "int", default: 0 })

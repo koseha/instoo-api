@@ -16,9 +16,6 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractTokenFromHeader(request);
 
-    console.log(request);
-    console.log(token);
-
     if (!token) {
       throw new UnauthorizedException("토큰이 제공되지 않았습니다.");
     }

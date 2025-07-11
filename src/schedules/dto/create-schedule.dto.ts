@@ -2,63 +2,55 @@
 import {
   IsString,
   IsOptional,
-  IsBoolean,
   IsDateString,
   IsUUID,
   MaxLength,
   MinLength,
   ValidateIf,
+  IsEnum,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { Trim } from "@/common/decorators/trim.decorator";
+import { ScheduleStatus } from "@/common/constants/schedule-status.enum";
 
 export class CreateScheduleDto {
   @ApiProperty({
     example: "게임방송",
     description: "일정 제목",
     minLength: 1,
-    maxLength: 200,
+    maxLength: 50,
   })
   @Trim()
   @IsString()
   @MinLength(1, { message: "제목은 최소 1글자 이상이어야 합니다." })
-  @MaxLength(200, { message: "제목은 최대 200글자까지 가능합니다." })
+  @MaxLength(50, { message: "제목은 최대 50글자까지 가능합니다." })
   title: string;
 
   @ApiProperty({
     example: "2025-01-15",
-    description: "일정 날짜 (YYYY-MM-DD 형식)",
+    description: "일정 날짜 (YYYY-MM-DD 형식) UTC",
   })
   @IsDateString({}, { message: "올바른 날짜 형식이어야 합니다. (YYYY-MM-DD)" })
   scheduleDate: string;
 
   @ApiProperty({
     example: "2025-01-15T18:00:00Z",
-    description: "시작 시간 (확정시간일 때만 필요)",
+    description: "시작 시간 (확정시간일 때만 필요) UTC",
     required: false,
   })
   @IsOptional()
-  @ValidateIf((o: CreateScheduleDto) => !o.isTimeUndecided && !o.isBreak)
+  @ValidateIf((o: CreateScheduleDto) => o.status === ScheduleStatus.SCHEDULED)
   @IsDateString({}, { message: "올바른 시간 형식이어야 합니다." })
   startTime?: string;
 
   @ApiProperty({
-    example: false,
-    description: "시간 미정 여부",
-    default: false,
+    example: ScheduleStatus.SCHEDULED,
+    description: "일정 상태",
+    enum: ScheduleStatus,
+    default: ScheduleStatus.SCHEDULED,
   })
-  @IsOptional()
-  @IsBoolean()
-  isTimeUndecided?: boolean = false;
-
-  @ApiProperty({
-    example: false,
-    description: "휴방 여부",
-    default: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  isBreak?: boolean = false;
+  @IsEnum(ScheduleStatus, { message: "올바른 일정 상태여야 합니다." })
+  status: ScheduleStatus = ScheduleStatus.SCHEDULED;
 
   @ApiProperty({
     example: "롤 랭크게임 예정",

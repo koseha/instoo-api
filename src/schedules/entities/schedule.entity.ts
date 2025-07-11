@@ -3,33 +3,32 @@ import { BaseVersionEntity } from "@/common/entities/base.entity";
 import { Column, Entity, Index, JoinColumn, ManyToOne, Generated } from "typeorm";
 import { Streamer } from "@/streamers/entities/streamer.entity";
 import { User } from "@/users/entities/user.entity";
+import { ScheduleStatus } from "@/common/constants/schedule-status.enum";
 
 @Entity("schedules")
 @Index(["scheduleDate"])
 @Index(["streamerUuid"])
-@Index(["isBreak"])
-@Index(["isTimeUndecided"])
+@Index(["status"])
 @Index(["scheduleDate", "streamerUuid"])
-@Index(["scheduleDate", "startTime", "id"]) // cursor 기반 페이지네이션용
 export class Schedule extends BaseVersionEntity {
   @Column({ type: "uuid", unique: true })
   @Generated("uuid")
   uuid: string;
 
-  @Column({ length: 200 })
+  @Column({ length: 50 })
   title: string;
 
-  @Column({ type: "date" })
-  scheduleDate: Date;
+  @Column({ type: "varchar", comment: "일정 날짜 (KST 기준 YYYY-MM-DD 형식)" })
+  scheduleDate: string;
 
-  @Column({ type: "timestamptz", nullable: true })
+  @Column({ type: "timestamptz", nullable: true, comment: "시작 시간 (UTC)" })
   startTime?: Date | null;
 
-  @Column({ default: false })
-  isTimeUndecided: boolean;
-
-  @Column({ default: false })
-  isBreak: boolean;
+  @Column({
+    type: "enum",
+    enum: ScheduleStatus,
+  })
+  status: ScheduleStatus;
 
   @Column({ type: "text", nullable: true })
   description?: string;
@@ -37,16 +36,22 @@ export class Schedule extends BaseVersionEntity {
   @Column({ type: "uuid" })
   streamerUuid: string;
 
+  @Column({ type: "uuid" })
+  createdByUserUuid: string;
+
+  @Column({ type: "uuid" })
+  updatedByUserUuid: string;
+
   // Relations
   @ManyToOne(() => Streamer, { nullable: false })
   @JoinColumn({ name: "streamerUuid", referencedColumnName: "uuid" })
   streamer: Streamer;
 
   @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: "createdBy" })
+  @JoinColumn({ name: "createdByUserUuid", referencedColumnName: "uuid" })
   createdByUser?: User;
 
   @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: "updatedBy" })
+  @JoinColumn({ name: "updatedByUserUuid", referencedColumnName: "uuid" })
   updatedByUser?: User;
 }

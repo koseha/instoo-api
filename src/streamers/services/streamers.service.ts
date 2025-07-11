@@ -7,7 +7,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource, EntityManager, Repository } from "typeorm";
 import { Streamer } from "../entities/streamer.entity";
 import { StreamerPlatform } from "../entities/streamer-platform.entity";
 import { User } from "@/users/entities/user.entity";
@@ -30,6 +30,7 @@ export class StreamersService {
     private readonly streamerPlatformRepository: Repository<StreamerPlatform>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private dataSource: DataSource,
   ) {}
 
   /**
@@ -39,51 +40,84 @@ export class StreamersService {
     createStreamerDto: CreateStreamerDto,
     userUuid: string,
   ): Promise<StreamerResponseDto> {
-    // 사용자 조회
-    const user = await this.userRepository.findOne({
-      where: { uuid: userUuid, isActive: true },
-    });
-    if (!user) {
-      throw new NotFoundException("사용자를 찾을 수 없습니다.");
-    }
+    return await this.dataSource.transaction(async (manager) => {
+      // 트랜잭션 내에서 사용할 repository들
+      const userRepository = manager.getRepository(User);
+      const streamerRepository = manager.getRepository(Streamer);
+      const streamerPlatformRepository = manager.getRepository(StreamerPlatform);
 
-    // 중복 확인: 이름과 플랫폼 조합으로 체크
-    if (Array.isArray(createStreamerDto.platforms) && createStreamerDto.platforms.length > 0) {
-      for (const platformDto of createStreamerDto.platforms) {
-        const existingStreamer = await this.findByNameAndPlatform(
-          createStreamerDto.name,
-          platformDto.platformName,
-        );
-        if (existingStreamer) {
-          throw new ConflictException(
-            `방송인 "${createStreamerDto.name}"이 플랫폼 "${platformDto.platformName}"에 이미 존재합니다.`,
+      // 사용자 조회
+      const user = await userRepository.findOne({
+        where: { uuid: userUuid, isActive: true },
+      });
+      if (!user) {
+        throw new NotFoundException("사용자를 찾을 수 없습니다.");
+      }
+
+      // 중복 확인: 이름과 플랫폼 조합으로 체크
+      if (Array.isArray(createStreamerDto.platforms) && createStreamerDto.platforms.length > 0) {
+        for (const platformDto of createStreamerDto.platforms) {
+          const existingStreamer = await this.findByNameAndPlatformInTransaction(
+            createStreamerDto.name,
+            platformDto.platformName,
+            manager,
           );
+          if (existingStreamer) {
+            throw new ConflictException(
+              `방송인 "${createStreamerDto.name}"이 플랫폼 "${platformDto.platformName}"에 이미 존재합니다.`,
+            );
+          }
         }
       }
-    }
 
-    // Streamer 생성
-    const streamer = this.streamerRepository.create({
-      ...createStreamerDto,
-      createdBy: user.id,
-      updatedBy: user.id,
+      // Streamer 생성
+      const streamer = streamerRepository.create({
+        ...createStreamerDto,
+        createdByUserUuid: userUuid,
+        updatedByUserUuid: userUuid,
+      });
+
+      const savedStreamer = await streamerRepository.save(streamer);
+
+      console.log(savedStreamer);
+
+      // 트랜잭션 내에서 결과 조회
+      return this.findOneInTransaction(savedStreamer.id, manager);
+    });
+  }
+
+  // 트랜잭션 내에서 사용할 헬퍼 메서드들
+  private async findByNameAndPlatformInTransaction(
+    name: string,
+    platformName: string,
+    manager: EntityManager,
+  ) {
+    const streamerRepository = manager.getRepository(Streamer);
+
+    return await streamerRepository
+      .createQueryBuilder("streamer")
+      .innerJoin("streamer.platforms", "platform")
+      .where("streamer.name = :name", { name })
+      .andWhere("platform.platformName = :platformName", { platformName })
+      .getOne();
+  }
+
+  private async findOneInTransaction(
+    id: number,
+    manager: EntityManager,
+  ): Promise<StreamerResponseDto> {
+    const streamerRepository = manager.getRepository(Streamer);
+
+    const streamer = await streamerRepository.findOne({
+      where: { id },
+      relations: ["platforms"], // 필요한 관계 포함
     });
 
-    const savedStreamer = await this.streamerRepository.save(streamer);
-
-    // 플랫폼 정보 저장
-    if (Array.isArray(createStreamerDto.platforms) && createStreamerDto.platforms.length > 0) {
-      const platforms = createStreamerDto.platforms.map((platformDto) =>
-        this.streamerPlatformRepository.create({
-          platformName: platformDto.platformName,
-          channelUrl: platformDto.channelUrl,
-          streamerUuid: savedStreamer.uuid,
-        }),
-      );
-      await this.streamerPlatformRepository.save(platforms);
+    if (!streamer) {
+      throw new NotFoundException("방송인을 찾을 수 없습니다.");
     }
 
-    return this.findOne(savedStreamer.id);
+    return StreamerResponseDto.of(streamer); // 또는 적절한 DTO 변환
   }
 
   /**
@@ -113,8 +147,6 @@ export class StreamersService {
   async findAll(body: GetStreamersDto): Promise<PagedStreamerResponseDto> {
     const { isVerified, platforms, followCount, createdAt, updatedAt, verifiedAt, page, size } =
       body;
-
-    console.log(body);
 
     // 쿼리 빌더 생성
     const queryBuilder = this.streamerRepository
