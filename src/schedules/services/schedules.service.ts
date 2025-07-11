@@ -23,6 +23,8 @@ import { UserRole } from "@/common/constants/user-role.enum";
 import { TimeUtils } from "@/common/utils/time.utils";
 import { ScheduleStatus } from "@/common/constants/schedule-status.enum";
 import { Schedule } from "../entities/schedule.entity";
+import { UpdateScheduleDto } from "../dto/update-schedule.dto";
+import { ScheduleHistoryService } from "./schedule-history.service";
 
 @Injectable()
 export class SchedulesService {
@@ -34,6 +36,7 @@ export class SchedulesService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private dataSource: DataSource,
+    private readonly scheduleHistoryService: ScheduleHistoryService,
   ) {}
 
   /**
@@ -280,211 +283,142 @@ export class SchedulesService {
   /**
    * 일정 수정 (충돌 방지 포함)
    */
-  // async update(
-  //   uuid: string,
-  //   updateScheduleDto: UpdateScheduleDto,
-  //   userUuid: string,
-  //   userRole: UserRole,
-  // ): Promise<ScheduleResponseDto> {
-  //   return await this.dataSource.transaction(async (manager) => {
-  //     // 1. 사용자 조회
-  //     const user = await manager.findOne(User, {
-  //       where: { uuid: userUuid, isActive: true },
-  //     });
+  async update(
+    uuid: string,
+    updateScheduleDto: UpdateScheduleDto,
+    userUuid: string,
+  ): Promise<ScheduleResponseDto> {
+    return await this.dataSource.transaction(async (manager) => {
+      // 1. 기존 일정 조회
+      const existingSchedule = await manager.findOne(Schedule, {
+        where: { uuid },
+        relations: ["streamer", "createdByUser", "updatedByUser"],
+      });
 
-  //     if (!user) {
-  //       throw new NotFoundException("사용자를 찾을 수 없습니다.");
-  //     }
+      if (!existingSchedule) {
+        throw new NotFoundException(`일정을 찾을 수 없습니다. (UUID: ${uuid})`);
+      }
 
-  //     // 2. 기존 일정 조회 (관계 데이터 포함)
-  //     const schedule = await manager.findOne(Schedule, {
-  //       where: { uuid },
-  //       relations: ["streamer", "createdByUser", "updatedByUser"],
-  //     });
+      // 2. 사용자 존재 확인
+      const user = await manager.findOne(User, {
+        where: { uuid: userUuid },
+      });
 
-  //     if (!schedule) {
-  //       throw new NotFoundException(`일정을 찾을 수 없습니다. (UUID: ${uuid})`);
-  //     }
+      if (!user) {
+        throw new UnauthorizedException("사용자를 찾을 수 없습니다.");
+      }
 
-  //     // 3. 과거 일정 수정 권한 확인 (관리자만 가능)
-  //     const today = new Date();
-  //     const todayKst = TimeUtils.toKst(today).split("T")[0];
-  //     const scheduleDateKst = TimeUtils.toKst(schedule.scheduleDate).split("T")[0];
+      // 3. 충돌 방지 - 마지막 수정 시간 확인
+      const lastUpdatedAt = new Date(updateScheduleDto.lastUpdatedAt);
+      const existingUpdatedAt = new Date(existingSchedule.updatedAt);
 
-  //     if (scheduleDateKst < todayKst && userRole !== UserRole.ADMIN) {
-  //       throw new ForbiddenException("과거 일정은 관리자만 수정할 수 있습니다.");
-  //     }
+      if (lastUpdatedAt.getTime() !== existingUpdatedAt.getTime()) {
+        throw new ConflictException(
+          "다른 사용자가 이미 수정한 일정입니다. 최신 정보를 다시 확인해주세요.",
+        );
+      }
 
-  //     // 4. 충돌 방지: lastUpdatedAt 체크
-  //     const requestLastUpdatedAt = new Date(updateScheduleDto.lastUpdatedAt);
-  //     const currentLastUpdatedAt = schedule.updatedAt;
+      // 4. 📝 히스토리 기록 - 업데이트 전 현재 상태 저장
+      await this.scheduleHistoryService.createHistory(
+        existingSchedule,
+        userUuid,
+        "UPDATE",
+        manager,
+      );
 
-  //     if (requestLastUpdatedAt.getTime() !== currentLastUpdatedAt.getTime()) {
-  //       throw new ConflictException(
-  //         "일정이 다른 사용자에 의해 수정되었습니다. 최신 정보를 다시 불러온 후 수정해주세요.",
-  //       );
-  //     }
+      // 5. 업데이트할 필드들 준비
+      const updateData: Partial<Schedule> = {
+        updatedByUserUuid: userUuid,
+      };
 
-  //     // 5. 수정할 데이터 준비
-  //     const updateData: Partial<Schedule> = {
-  //       updatedByUser: user,
-  //       version: schedule.version + 1,
-  //     };
+      // 제목 업데이트
+      if (updateScheduleDto.title !== undefined) {
+        updateData.title = updateScheduleDto.title;
+      }
 
-  //     // 기본 필드 업데이트
-  //     if (updateScheduleDto.title !== undefined) {
-  //       updateData.title = updateScheduleDto.title;
-  //     }
+      // 상태 업데이트
+      if (updateScheduleDto.status !== undefined) {
+        updateData.status = updateScheduleDto.status;
+      }
 
-  //     if (updateScheduleDto.description !== undefined) {
-  //       updateData.description = updateScheduleDto.description;
-  //     }
+      // 설명 업데이트
+      if (updateScheduleDto.description !== undefined) {
+        updateData.description = updateScheduleDto.description;
+      }
 
-  //     if (updateScheduleDto.isBreak !== undefined) {
-  //       updateData.isBreak = updateScheduleDto.isBreak;
-  //     }
+      // 6. 시작 시간 처리
+      if (updateScheduleDto.startTime !== undefined) {
+        // startTime이 제공된 경우
+        if (updateScheduleDto.startTime) {
+          // 상태가 SCHEDULED인 경우에만 시작 시간 설정 가능
+          const finalStatus = updateScheduleDto.status ?? existingSchedule.status;
+          if (finalStatus !== ScheduleStatus.SCHEDULED) {
+            throw new BadRequestException(
+              "확정된 일정(SCHEDULED)에서만 시작 시간을 설정할 수 있습니다.",
+            );
+          }
 
-  //     if (updateScheduleDto.isTimeUndecided !== undefined) {
-  //       updateData.isTimeUndecided = updateScheduleDto.isTimeUndecided;
-  //     }
+          const startTimeDate = new Date(updateScheduleDto.startTime);
+          const startTimeDateString = TimeUtils.toKstDateString(startTimeDate);
+          const today = TimeUtils.toKstDateString(new Date());
 
-  //     // 6. 날짜 변환 및 시작 시간 처리
-  //     let startTime: Date | undefined = schedule.startTime || undefined;
+          // 과거 시간 확인
+          if (startTimeDateString < today) {
+            throw new BadRequestException("과거 날짜에는 일정을 설정할 수 없습니다.");
+          }
 
-  //     // 시작 시간 처리
-  //     if (updateScheduleDto.startTime !== undefined) {
-  //       if (updateScheduleDto.startTime && !updateData.isTimeUndecided && !updateData.isBreak) {
-  //         startTime = new Date(updateScheduleDto.startTime);
-  //         updateData.startTime = startTime;
-  //       } else {
-  //         startTime = undefined;
-  //         updateData.startTime = null;
-  //       }
-  //     } else {
-  //       // 시작 시간이 변경되지 않았지만 isBreak 또는 isTimeUndecided가 변경된 경우
-  //       if (updateData.isBreak || updateData.isTimeUndecided) {
-  //         startTime = undefined;
-  //         updateData.startTime = null;
-  //       }
-  //     }
+          updateData.startTime = startTimeDate;
+        } else {
+          // startTime이 null/undefined로 제공된 경우 - 시간 삭제
+          updateData.startTime = null;
+        }
+      } else {
+        // startTime이 dto에 없는 경우, 상태 변경에 따른 처리
+        if (updateScheduleDto.status !== undefined) {
+          const finalStatus = updateScheduleDto.status;
 
-  //     // 7. 비즈니스 로직 검증 (변경된 내용에 대해서만)
-  //     const finalIsBreak = updateData.isBreak !== undefined ? updateData.isBreak : schedule.isBreak;
-  //     const finalIsTimeUndecided =
-  //       updateData.isTimeUndecided !== undefined
-  //         ? updateData.isTimeUndecided
-  //         : schedule.isTimeUndecided;
+          // SCHEDULED가 아닌 상태로 변경하는 경우 시작 시간 제거
+          if (finalStatus !== ScheduleStatus.SCHEDULED && existingSchedule.startTime) {
+            updateData.startTime = null;
+          }
 
-  //     await this.validateScheduleUpdate(
-  //       schedule.id,
-  //       schedule.streamer.id,
-  //       startTime,
-  //       finalIsTimeUndecided,
-  //       finalIsBreak,
-  //     );
+          // SCHEDULED로 변경하는 경우 시작 시간이 없으면 에러
+          if (finalStatus === ScheduleStatus.SCHEDULED && !existingSchedule.startTime) {
+            throw new BadRequestException("확정된 일정(SCHEDULED)에는 시작 시간이 필요합니다.");
+          }
+        }
+      }
 
-  //     // 8. 일정 수정 실행
-  //     Object.assign(schedule, updateData);
-  //     const savedSchedule = await manager.save(schedule);
+      // 7. 상태와 시작 시간 일관성 검사
+      const finalStatus = updateScheduleDto.status ?? existingSchedule.status;
+      const finalStartTime =
+        updateData.startTime !== undefined ? updateData.startTime : existingSchedule.startTime;
 
-  //     // 9. 저장된 일정 조회 (관계 데이터 포함)
-  //     const result = await manager.findOne(Schedule, {
-  //       where: { id: savedSchedule.id },
-  //       relations: ["streamer", "createdByUser", "updatedByUser"],
-  //     });
+      if (finalStatus === ScheduleStatus.SCHEDULED && !finalStartTime) {
+        throw new BadRequestException("확정된 일정(SCHEDULED)에는 시작 시간이 필요합니다.");
+      }
 
-  //     if (!result) {
-  //       throw new InternalServerErrorException("일정 수정 중 오류가 발생했습니다.");
-  //     }
+      if (finalStatus !== ScheduleStatus.SCHEDULED && finalStartTime) {
+        // 이미 위에서 처리했지만 안전을 위해 다시 한 번 확인
+        updateData.startTime = null;
+      }
 
-  //     // 10. DTO 변환 후 반환
-  //     return ScheduleResponseDto.of(result);
-  //   });
-  // }
+      // 8. 업데이트 실행
+      await manager.update(Schedule, { uuid }, updateData);
 
-  // /**
-  //  * 일정 수정 시 비즈니스 로직 검증
-  //  */
-  // private async validateScheduleUpdate(
-  //   scheduleId: number,
-  //   streamerId: number,
-  //   scheduleDate: Date,
-  //   startTime: Date | undefined,
-  //   isTimeUndecided: boolean,
-  //   isBreak: boolean,
-  // ): Promise<void> {
-  //   const today = new Date();
-  //   const todayKst = TimeUtils.toKst(today).split("T")[0];
-  //   const scheduleDateKst = TimeUtils.toKst(scheduleDate).split("T")[0];
+      // 9. 업데이트된 일정 조회
+      const updatedSchedule = await manager.findOne(Schedule, {
+        where: { uuid },
+        relations: ["streamer", "createdByUser", "updatedByUser"],
+      });
 
-  //   if (scheduleDateKst < todayKst) {
-  //     throw new BadRequestException("방송일은 오늘 이후여야 합니다.");
-  //   }
+      if (!updatedSchedule) {
+        throw new InternalServerErrorException("일정 업데이트 후 조회에 실패했습니다.");
+      }
 
-  //   // 해당 방송일의 기존 일정들 조회 (수정 중인 일정은 제외)
-  //   const existingSchedules = await this.scheduleRepository.find({
-  //     where: {
-  //       streamer: { id: streamerId },
-  //       scheduleDate: scheduleDate,
-  //       id: Not(scheduleId), // 수정 중인 일정은 제외
-  //     },
-  //     order: { startTime: "ASC" },
-  //   });
-
-  //   // 휴방 관련 검증
-  //   if (isBreak) {
-  //     // 해당 방송일에 다른 일정이 존재하면 휴방 일정 등록 불가
-  //     if (existingSchedules.length > 0) {
-  //       throw new ConflictException(
-  //         "해당 방송일에 이미 다른 일정이 존재하여 휴방 일정으로 수정할 수 없습니다.",
-  //       );
-  //     }
-  //   } else {
-  //     // 휴방이 아닌 경우, 해당 방송일에 휴방 일정이 있으면 등록 불가
-  //     const hasBreakSchedule = existingSchedules.some((schedule) => schedule.isBreak);
-  //     if (hasBreakSchedule) {
-  //       throw new ConflictException(
-  //         "해당 방송일에 휴방 일정이 존재하여 다른 일정으로 수정할 수 없습니다.",
-  //       );
-  //     }
-  //   }
-
-  //   // 방송일 기준 최대 2개 일정 제한
-  //   if (existingSchedules.length >= 2) {
-  //     throw new ConflictException("방송일 기준으로 최대 2개의 일정만 등록할 수 있습니다.");
-  //   }
-
-  //   // 시간 미정 관련 검증
-  //   if (isTimeUndecided) {
-  //     const timeUndecidedCount = existingSchedules.filter(
-  //       (schedule) => schedule.isTimeUndecided,
-  //     ).length;
-  //     if (timeUndecidedCount >= 2) {
-  //       throw new ConflictException("해당 방송일에 시간 미정 일정은 2개 이상 등록할 수 없습니다.");
-  //     }
-  //   }
-
-  //   // 시작 시간 중복 검증 (시간이 지정된 경우만)
-  //   if (startTime && !isTimeUndecided && !isBreak) {
-  //     for (const existingSchedule of existingSchedules) {
-  //       if (
-  //         existingSchedule.startTime &&
-  //         !existingSchedule.isTimeUndecided &&
-  //         !existingSchedule.isBreak
-  //       ) {
-  //         const timeDiff = Math.abs(startTime.getTime() - existingSchedule.startTime.getTime());
-  //         const hoursDiff = timeDiff / (1000 * 60 * 60); // 밀리초를 시간으로 변환
-
-  //         // ±2시간 이내에 다른 일정이 있으면 등록 불가
-  //         if (hoursDiff < 2) {
-  //           throw new ConflictException(
-  //             "시작 시간 기준 ±2시간 이내에 다른 일정이 존재하여 수정할 수 없습니다.",
-  //           );
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
+      return ScheduleResponseDto.of(updatedSchedule);
+    });
+  }
 
   /**
    * 일정 삭제 (관리자만 가능)

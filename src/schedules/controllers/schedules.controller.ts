@@ -102,66 +102,60 @@ export class SchedulesController {
   /**
    *
    */
-  // @Patch("v1/schedules/:uuid")
-  // @ApiOperation({
-  //   summary: "일정 정보 수정",
-  //   description:
-  //     "일정 정보를 수정합니다. 로그인한 사용자 누구나 수정할 수 있습니다. 충돌 방지를 위해 기존 일정의 updatedAt 값을 lastUpdatedAt으로 전송해야 합니다.",
-  // })
-  // @ApiParam({ name: "id", description: "일정 ID" })
-  // @ApiInstooResponses(ScheduleResponseDto, {
-  //   success: {
-  //     status: 200,
-  //     description: "일정 수정 성공",
-  //   },
-  //   errors: [
-  //     {
-  //       status: 400,
-  //       description: "잘못된 요청",
-  //       code: "BAD_REQUEST",
-  //       message: "요청 데이터가 올바르지 않습니다.",
-  //     },
-  //     {
-  //       status: 401,
-  //       description: "인증 실패",
-  //       code: "UNAUTHORIZED",
-  //       message: "인증이 필요합니다.",
-  //     },
-  //     {
-  //       status: 403,
-  //       description: "권한 없음",
-  //       code: "FORBIDDEN",
-  //       message: "과거 일정은 관리자만 수정할 수 있습니다.",
-  //     },
-  //     {
-  //       status: 404,
-  //       description: "일정을 찾을 수 없음",
-  //       code: "SCHEDULE_NOT_FOUND",
-  //       message: "해당 일정을 찾을 수 없습니다.",
-  //     },
-  //     {
-  //       status: 409,
-  //       description: "충돌 발생",
-  //       code: "CONFLICT",
-  //       message: "일정이 다른 사용자에 의해 수정되었습니다.",
-  //     },
-  //   ],
-  // })
-  // @UseGuards(JwtAuthGuard)
-  // @ApiBearerAuth()
-  // async update(
-  //   @Param("uuid") uuid: string,
-  //   @Body() updateScheduleDto: UpdateScheduleDto,
-  //   @Req() req: AuthenticatedRequest,
-  // ): Promise<InstooApiResponse<ScheduleResponseDto>> {
-  //   const schedule = await this.schedulesService.update(
-  //     uuid,
-  //     updateScheduleDto,
-  //     req.user!.sub,
-  //     req.user!.role,
-  //   );
-  //   return InstooApiResponse.success(schedule);
-  // }
+  @Patch("v1/schedules/:uuid")
+  @ApiOperation({
+    summary: "일정 정보 수정",
+    description:
+      "일정 정보를 수정합니다. 로그인한 사용자 누구나 수정할 수 있습니다. 충돌 방지를 위해 기존 일정의 updatedAt 값을 lastUpdatedAt으로 전송해야 합니다.",
+  })
+  @ApiInstooResponses(ScheduleResponseDto, {
+    success: {
+      status: 200,
+      description: "일정 수정 성공",
+    },
+    errors: [
+      {
+        status: 400,
+        description: "잘못된 요청",
+        code: "BAD_REQUEST",
+        message: "요청 데이터가 올바르지 않습니다.",
+      },
+      {
+        status: 401,
+        description: "인증 실패",
+        code: "UNAUTHORIZED",
+        message: "인증이 필요합니다.",
+      },
+      {
+        status: 403,
+        description: "권한 없음",
+        code: "FORBIDDEN",
+        message: "과거 일정은 관리자만 수정할 수 있습니다.",
+      },
+      {
+        status: 404,
+        description: "일정을 찾을 수 없음",
+        code: "SCHEDULE_NOT_FOUND",
+        message: "해당 일정을 찾을 수 없습니다.",
+      },
+      {
+        status: 409,
+        description: "충돌 발생",
+        code: "CONFLICT",
+        message: "일정이 다른 사용자에 의해 수정되었습니다.",
+      },
+    ],
+  })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async update(
+    @Param("uuid") uuid: string,
+    @Body() updateScheduleDto: UpdateScheduleDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<InstooApiResponse<ScheduleResponseDto>> {
+    const schedule = await this.schedulesService.update(uuid, updateScheduleDto, req.user!.sub);
+    return InstooApiResponse.success(schedule);
+  }
 
   /**
    *
