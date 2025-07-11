@@ -37,7 +37,7 @@ interface GoogleUserInfo {
 }
 
 interface RefreshTokenPayload {
-  sub: number;
+  sub: string;
   type: string;
 }
 
@@ -230,7 +230,7 @@ export class AuthService {
 
     // Refresh Token (더 긴 만료 시간)
     const refreshToken = this.jwtService.sign(
-      { sub: user.id, type: "refresh" },
+      { sub: user.uuid, type: "refresh" },
       { expiresIn: "30d" },
     );
 
@@ -253,7 +253,7 @@ export class AuthService {
       }
 
       const user = await this.userRepository.findOne({
-        where: { id: decoded.sub, isActive: true },
+        where: { uuid: decoded.sub, isActive: true },
       });
 
       if (!user) {

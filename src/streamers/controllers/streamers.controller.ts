@@ -113,7 +113,7 @@ export class StreamersController {
     message: "검색어는 최소 2글자 이상이어야 합니다.",
   })
   async search(@Query("qName") qName: string): Promise<InstooApiResponse<StreamerSearchDto[]>> {
-    const result = await this.streamersService.findAllByName(qName);
+    const result = await this.streamersService.searchStreamersByName(qName);
     return InstooApiResponse.success(result);
   }
 
@@ -280,12 +280,11 @@ export class StreamersController {
     return InstooApiResponse.success(streamer, "방송인 정보를 성공적으로 조회했습니다.");
   }
 
-  @Delete(":id")
+  @Delete(":uuid")
   @ApiOperation({
     summary: "❌ 방송인 삭제",
     description: "방송인을 삭제합니다. 관리자만 삭제할 수 있습니다.",
   })
-  @ApiParam({ name: "id", description: "방송인 ID" })
   @ApiInstooSimpleResponses({
     success: {
       status: 204,
@@ -316,10 +315,7 @@ export class StreamersController {
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(
-    @Param("id", ParseIntPipe) id: number,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<void> {
-    await this.streamersService.remove(id, req.user!.sub, req.user!.role);
+  async remove(@Param("uuid") uuid: string, @Req() req: AuthenticatedRequest): Promise<void> {
+    await this.streamersService.remove(uuid, req.user!.sub, req.user!.role);
   }
 }

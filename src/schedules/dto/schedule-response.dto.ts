@@ -30,19 +30,13 @@ export class UserSummaryDto {
 
 export class StreamerSummaryDto {
   @ApiProperty({
-    example: 1,
-    description: "방송인 ID",
-  })
-  id: number;
-
-  @ApiProperty({
     example: "550e8400-e29b-41d4-a716-446655440000",
     description: "방송인 UUID",
   })
   uuid: string;
 
   @ApiProperty({
-    example: "우왁굳",
+    example: "한동숙",
     description: "방송인 이름",
   })
   name: string;
@@ -62,7 +56,6 @@ export class StreamerSummaryDto {
 
   static of(streamer: Streamer): StreamerSummaryDto {
     return {
-      id: streamer.id,
       uuid: streamer.uuid,
       name: streamer.name,
       profileImageUrl: streamer.profileImageUrl,
@@ -72,12 +65,6 @@ export class StreamerSummaryDto {
 }
 
 export class ScheduleResponseDto {
-  @ApiProperty({
-    example: 1,
-    description: "일정 ID",
-  })
-  id: number;
-
   @ApiProperty({
     example: "550e8400-e29b-41d4-a716-446655440000",
     description: "일정 UUID",
@@ -169,7 +156,6 @@ export class ScheduleResponseDto {
 
   static of(schedule: Schedule): ScheduleResponseDto {
     return {
-      id: schedule.id,
       uuid: schedule.uuid,
       title: schedule.title,
       // scheduleDate는 이미 문자열(YYYY-MM-DD)로 저장되어 있으므로 그대로 사용

@@ -10,7 +10,6 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  ParseIntPipe,
   Req,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from "@nestjs/swagger";
@@ -18,11 +17,7 @@ import { SchedulesService } from "../services/schedules.service";
 import { CreateScheduleDto } from "../dto/create-schedule.dto";
 import { UpdateScheduleDto } from "../dto/update-schedule.dto";
 import { GetSchedulesDto } from "../dto/get-schedules.dto";
-import {
-  ScheduleResponseDto,
-  PagedScheduleResponseDto,
-  SchedulesResponseDto,
-} from "../dto/schedule-response.dto";
+import { ScheduleResponseDto, SchedulesResponseDto } from "../dto/schedule-response.dto";
 import { InstooApiResponse } from "@/common/dto/instoo-api-response.dto";
 import {
   ApiInstooResponse,
@@ -160,12 +155,11 @@ export class SchedulesController {
   /**
    *
    */
-  @Get(":id")
+  @Get("v1/schedules/:uuid")
   @ApiOperation({
     summary: "일정 상세 조회",
-    description: "ID로 특정 일정의 상세 정보를 조회합니다.",
+    description: "UUID로 특정 일정의 상세 정보를 조회합니다.",
   })
-  @ApiParam({ name: "id", description: "일정 ID" })
   @ApiInstooResponses(ScheduleResponseDto, {
     success: {
       status: 200,
@@ -180,22 +174,19 @@ export class SchedulesController {
       },
     ],
   })
-  async findOne(
-    @Param("id", ParseIntPipe) id: number,
-  ): Promise<InstooApiResponse<ScheduleResponseDto>> {
-    const schedule = await this.schedulesService.findOne(id);
+  async findOne(@Param("uuid") uuid: string): Promise<InstooApiResponse<ScheduleResponseDto>> {
+    const schedule = await this.schedulesService.findByUuid(uuid);
     return InstooApiResponse.success(schedule, "일정 정보를 성공적으로 조회했습니다.");
   }
 
   /**
    *
    */
-  @Delete(":id")
+  @Delete("v1/schedules/:uuid")
   @ApiOperation({
     summary: "일정 삭제",
     description: "일정을 삭제합니다. 관리자만 삭제할 수 있습니다.",
   })
-  @ApiParam({ name: "id", description: "일정 ID" })
   @ApiInstooSimpleResponses({
     success: {
       status: 204,
@@ -226,11 +217,8 @@ export class SchedulesController {
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(
-    @Param("id", ParseIntPipe) id: number,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<void> {
-    await this.schedulesService.remove(id, req.user!.sub, req.user!.role);
+  async remove(@Param("uuid") uuid: string, @Req() req: AuthenticatedRequest): Promise<void> {
+    await this.schedulesService.remove(uuid, req.user!.sub, req.user!.role);
   }
 
   /**

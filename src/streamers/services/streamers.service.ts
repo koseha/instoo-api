@@ -20,6 +20,7 @@ import {
   StreamerSearchDto,
 } from "../dto/streamer-response.dto";
 import { UserRole } from "@/common/constants/user-role.enum";
+import { StreamerHistoryService } from "./streamer-history.service";
 
 @Injectable()
 export class StreamersService {
@@ -31,6 +32,7 @@ export class StreamersService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private dataSource: DataSource,
+    private readonly streamerHistoryService: StreamerHistoryService,
   ) {}
 
   /**
@@ -73,16 +75,19 @@ export class StreamersService {
       // Streamer 생성
       const streamer = streamerRepository.create({
         ...createStreamerDto,
-        createdByUserUuid: userUuid,
-        updatedByUserUuid: userUuid,
+        createdBy: userUuid,
+        updatedBy: userUuid,
       });
 
       const savedStreamer = await streamerRepository.save(streamer);
 
       console.log(savedStreamer);
 
+      // 생성 이력 기록
+      await this.streamerHistoryService.recordCreate(savedStreamer, userUuid);
+
       // 트랜잭션 내에서 결과 조회
-      return this.findOneInTransaction(savedStreamer.id, manager);
+      return this.findOneInTransaction(savedStreamer.uuid, manager);
     });
   }
 
@@ -103,13 +108,13 @@ export class StreamersService {
   }
 
   private async findOneInTransaction(
-    id: number,
+    uuid: string,
     manager: EntityManager,
   ): Promise<StreamerResponseDto> {
     const streamerRepository = manager.getRepository(Streamer);
 
     const streamer = await streamerRepository.findOne({
-      where: { id },
+      where: { uuid },
       relations: ["platforms"], // 필요한 관계 포함
     });
 
@@ -123,7 +128,7 @@ export class StreamersService {
   /**
    * 방송인 목록 조회 - 간편 검색
    */
-  async findAllByName(qName: string): Promise<StreamerSearchDto[]> {
+  async searchStreamersByName(qName: string): Promise<StreamerSearchDto[]> {
     if (!qName || qName.trim().length < 2)
       throw new BadRequestException("검색어는 최소 2글자 이상이어야 합니다.");
 
@@ -217,22 +222,6 @@ export class StreamersService {
   }
 
   /**
-   * ID로 방송인 조회
-   */
-  async findOne(id: number): Promise<StreamerResponseDto> {
-    const streamer = await this.streamerRepository.findOne({
-      where: { id, isActive: true },
-      relations: ["platforms", "createdByUser", "updatedByUser"],
-    });
-
-    if (!streamer) {
-      throw new NotFoundException(`방송인을 찾을 수 없습니다. (ID: ${id})`);
-    }
-
-    return this.toResponseDto(streamer);
-  }
-
-  /**
    * UUID로 방송인 조회
    */
   async findByUuid(uuid: string): Promise<StreamerResponseDto> {
@@ -257,82 +246,101 @@ export class StreamersService {
     userUuid: string,
     _userRole: UserRole,
   ): Promise<StreamerResponseDto> {
-    // 사용자 조회
-    const user = await this.userRepository.findOne({
-      where: { uuid: userUuid, isActive: true },
-    });
-    if (!user) {
-      throw new NotFoundException("사용자를 찾을 수 없습니다.");
-    }
-
-    // 기존 방송인 정보 조회
-    const streamer = await this.streamerRepository.findOne({
-      where: { uuid, isActive: true },
-      relations: ["platforms"],
-    });
-
-    if (!streamer) {
-      throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
-    }
-
-    // 충돌 방지: updatedAt 체크
-    const requestLastUpdatedAt = new Date(updateStreamerDto.lastUpdatedAt);
-    const currentLastUpdatedAt = streamer.updatedAt;
-
-    if (requestLastUpdatedAt.getTime() !== currentLastUpdatedAt.getTime()) {
-      throw new ConflictException(
-        `방송인 정보가 다른 사용자에 의해 수정되었습니다. 최신 정보를 다시 불러온 후 수정해주세요.`,
-      );
-    }
-
-    // 이름 변경 시 중복 확인
-    if (updateStreamerDto.name && updateStreamerDto.name !== streamer.name) {
-      const existingStreamer = await this.streamerRepository.findOne({
-        where: { name: updateStreamerDto.name, isActive: true },
+    return await this.dataSource.transaction(async (transactionalEntityManager) => {
+      // 사용자 조회
+      const user = await transactionalEntityManager.findOne(User, {
+        where: { uuid: userUuid, isActive: true },
       });
-      if (existingStreamer && existingStreamer.uuid !== uuid) {
-        throw new ConflictException(`방송인 이름 "${updateStreamerDto.name}"이 이미 존재합니다.`);
+      if (!user) {
+        throw new NotFoundException("사용자를 찾을 수 없습니다.");
       }
-    }
 
-    // 기본 정보 업데이트
-    Object.assign(streamer, {
-      name: updateStreamerDto.name ?? streamer.name,
-      profileImageUrl: updateStreamerDto.profileImageUrl ?? streamer.profileImageUrl,
-      description: updateStreamerDto.description ?? streamer.description,
-      updatedBy: user.id,
-    });
+      // 기존 방송인 정보 조회 (이력 기록용)
+      const existingStreamer = await transactionalEntityManager.findOne(Streamer, {
+        where: { uuid, isActive: true },
+        relations: ["platforms"],
+      });
 
-    await this.streamerRepository.save(streamer);
+      if (!existingStreamer) {
+        throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
+      }
 
-    // 플랫폼 정보 업데이트
-    if (updateStreamerDto.platforms !== undefined) {
-      // 기존 플랫폼 비활성화
-      await this.streamerPlatformRepository.update(
-        { streamerUuid: streamer.uuid },
-        { isActive: false },
+      // 충돌 방지: updatedAt 체크
+      const requestLastUpdatedAt = new Date(updateStreamerDto.lastUpdatedAt);
+      const currentLastUpdatedAt = existingStreamer.updatedAt;
+
+      if (requestLastUpdatedAt.getTime() !== currentLastUpdatedAt.getTime()) {
+        throw new ConflictException(
+          `방송인 정보가 다른 사용자에 의해 수정되었습니다. 최신 정보를 다시 불러온 후 수정해주세요.`,
+        );
+      }
+
+      // 이름 변경 시 중복 확인
+      if (updateStreamerDto.name && updateStreamerDto.name !== existingStreamer.name) {
+        const duplicateStreamer = await transactionalEntityManager.findOne(Streamer, {
+          where: { name: updateStreamerDto.name, isActive: true },
+        });
+        if (duplicateStreamer && duplicateStreamer.uuid !== uuid) {
+          throw new ConflictException(`방송인 이름 "${updateStreamerDto.name}"이 이미 존재합니다.`);
+        }
+      }
+
+      // 기본 정보 업데이트
+      Object.assign(existingStreamer, {
+        name: updateStreamerDto.name ?? existingStreamer.name,
+        profileImageUrl: updateStreamerDto.profileImageUrl ?? existingStreamer.profileImageUrl,
+        description: updateStreamerDto.description ?? existingStreamer.description,
+        updatedBy: user.uuid,
+        version: existingStreamer.version + 1,
+      });
+
+      await transactionalEntityManager.save(Streamer, existingStreamer);
+
+      // 플랫폼 정보 업데이트
+      if (updateStreamerDto.platforms !== undefined) {
+        // 기존 플랫폼 비활성화
+        await transactionalEntityManager.update(
+          StreamerPlatform,
+          { streamerUuid: existingStreamer.uuid },
+          { isActive: false },
+        );
+
+        // 새 플랫폼 추가
+        if (updateStreamerDto.platforms.length > 0) {
+          const platforms = updateStreamerDto.platforms.map((platformDto) =>
+            transactionalEntityManager.create(StreamerPlatform, {
+              platformName: platformDto.platformName,
+              channelUrl: platformDto.channelUrl,
+              streamerUuid: existingStreamer.uuid,
+            }),
+          );
+          await transactionalEntityManager.save(StreamerPlatform, platforms);
+        }
+      }
+
+      // 수정된 데이터 다시 조회 (이력 기록용)
+      const updatedStreamer = await transactionalEntityManager.findOne(Streamer, {
+        where: { uuid },
+        relations: ["platforms"],
+      });
+
+      // 수정 이력 기록 (트랜잭션 내에서)
+      await this.streamerHistoryService.recordUpdateWithTransaction(
+        transactionalEntityManager,
+        updatedStreamer!,
+        existingStreamer,
+        userUuid,
       );
 
-      // 새 플랫폼 추가
-      if (updateStreamerDto.platforms.length > 0) {
-        const platforms = updateStreamerDto.platforms.map((platformDto) =>
-          this.streamerPlatformRepository.create({
-            platformName: platformDto.platformName,
-            channelUrl: platformDto.channelUrl,
-            streamerUuid: streamer.uuid,
-          }),
-        );
-        await this.streamerPlatformRepository.save(platforms);
-      }
-    }
-
-    return this.findByUuid(uuid);
+      // 트랜잭션 완료 후 최종 결과 반환
+      return this.findByUuid(uuid);
+    });
   }
 
   /**
    * 방송인 삭제 (관리자만 가능)
    */
-  async remove(id: number, userUuid: string, userRole: UserRole): Promise<void> {
+  async remove(uuid: string, userUuid: string, userRole: UserRole): Promise<void> {
     // 권한 확인
     if (userRole !== UserRole.ADMIN) {
       throw new ForbiddenException("관리자만 방송인을 삭제할 수 있습니다.");
@@ -340,11 +348,11 @@ export class StreamersService {
 
     // 방송인 조회
     const streamer = await this.streamerRepository.findOne({
-      where: { id, isActive: true },
+      where: { uuid, isActive: true },
     });
 
     if (!streamer) {
-      throw new NotFoundException(`방송인을 찾을 수 없습니다. (ID: ${id})`);
+      throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
     }
 
     // Soft delete

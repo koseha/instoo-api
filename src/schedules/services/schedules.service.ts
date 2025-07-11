@@ -25,6 +25,7 @@ import { ScheduleStatus } from "@/common/constants/schedule-status.enum";
 import { Schedule } from "../entities/schedule.entity";
 import { UpdateScheduleDto } from "../dto/update-schedule.dto";
 import { ScheduleHistoryService } from "./schedule-history.service";
+import { HistoryType } from "@/common/constants/history-type.enum";
 
 @Injectable()
 export class SchedulesService {
@@ -114,8 +115,8 @@ export class SchedulesService {
         status: createScheduleDto.status, // enum 값 직접 저장
         description: createScheduleDto.description,
         streamerUuid: createScheduleDto.streamerUuid,
-        createdByUserUuid: userUuid, // BaseVersionEntity의 createdBy 필드
-        updatedByUserUuid: userUuid, // BaseVersionEntity의 updatedBy 필드
+        createdBy: userUuid, // BaseVersionEntity의 createdBy 필드
+        updatedBy: userUuid, // BaseVersionEntity의 updatedBy 필드
       });
 
       // 8. 저장
@@ -123,7 +124,7 @@ export class SchedulesService {
 
       // 9. 관계 데이터와 함께 다시 조회
       const scheduleWithRelations = await manager.findOne(Schedule, {
-        where: { id: savedSchedule.id },
+        where: { uuid: savedSchedule.uuid },
         relations: ["streamer", "createdByUser", "updatedByUser"],
       });
 
@@ -249,22 +250,6 @@ export class SchedulesService {
   }
 
   /**
-   * ID로 일정 상세 조회
-   */
-  async findOne(id: number): Promise<ScheduleResponseDto> {
-    const schedule = await this.scheduleRepository.findOne({
-      where: { id },
-      relations: ["streamer", "createdByUser", "updatedByUser"],
-    });
-
-    if (!schedule) {
-      throw new NotFoundException(`일정을 찾을 수 없습니다. (ID: ${id})`);
-    }
-
-    return ScheduleResponseDto.of(schedule);
-  }
-
-  /**
    * UUID로 일정 상세 조회
    */
   async findByUuid(uuid: string): Promise<ScheduleResponseDto> {
@@ -322,13 +307,13 @@ export class SchedulesService {
       await this.scheduleHistoryService.createHistory(
         existingSchedule,
         userUuid,
-        "UPDATE",
+        HistoryType.CREATE,
         manager,
       );
 
       // 5. 업데이트할 필드들 준비
       const updateData: Partial<Schedule> = {
-        updatedByUserUuid: userUuid,
+        updatedBy: userUuid,
       };
 
       // 제목 업데이트
@@ -423,7 +408,7 @@ export class SchedulesService {
   /**
    * 일정 삭제 (관리자만 가능)
    */
-  async remove(id: number, userUuid: string, userRole: UserRole): Promise<void> {
+  async remove(uuid: string, userUuid: string, userRole: UserRole): Promise<void> {
     // 권한 확인
     if (userRole !== UserRole.ADMIN) {
       throw new ForbiddenException("관리자만 일정을 삭제할 수 있습니다.");
@@ -431,14 +416,14 @@ export class SchedulesService {
 
     // 일정 조회
     const schedule = await this.scheduleRepository.findOne({
-      where: { id },
+      where: { uuid },
     });
 
     if (!schedule) {
-      throw new NotFoundException(`일정을 찾을 수 없습니다. (ID: ${id})`);
+      throw new NotFoundException(`일정을 찾을 수 없습니다. (UUID: ${uuid})`);
     }
 
     // Soft delete
-    await this.scheduleRepository.softDelete(id);
+    await this.scheduleRepository.softDelete(uuid);
   }
 }

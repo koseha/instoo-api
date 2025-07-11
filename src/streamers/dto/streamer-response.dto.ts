@@ -67,12 +67,6 @@ export class StreamerPlatformResponseDto {
 
 export class StreamerResponseDto {
   @ApiProperty({
-    example: 1,
-    description: "방송인 ID",
-  })
-  id: number;
-
-  @ApiProperty({
     example: "550e8400-e29b-41d4-a716-446655440000",
     description: "방송인 UUID",
   })
@@ -145,7 +139,6 @@ export class StreamerResponseDto {
 
   static of(streamer: Streamer): StreamerResponseDto {
     return {
-      id: streamer.id,
       uuid: streamer.uuid,
       name: streamer.name,
       profileImageUrl: streamer.profileImageUrl,

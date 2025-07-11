@@ -2,8 +2,9 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, EntityManager } from "typeorm";
-import { ScheduleHistory, ScheduleHistoryData } from "../entities/schedule-history.entity";
+import { ScheduleHistory } from "../entities/schedule-history.entity";
 import { Schedule } from "../entities/schedule.entity";
+import { HistoryType } from "@/common/constants/history-type.enum";
 
 @Injectable()
 export class ScheduleHistoryService {
@@ -21,74 +22,24 @@ export class ScheduleHistoryService {
    */
   async createHistory(
     schedule: Schedule,
-    modifiedByUserUuid: string,
-    changeType: "CREATE" | "UPDATE" | "DELETE",
+    modifiedBy: string,
+    action: HistoryType,
     manager?: EntityManager,
   ): Promise<ScheduleHistory> {
     const repository = manager
       ? manager.getRepository(ScheduleHistory)
       : this.scheduleHistoryRepository;
 
-    // 다음 버전 번호 계산
-    const nextVersion = await this.getNextVersion(schedule.uuid, manager);
-
     // 스케줄 데이터를 히스토리용으로 정리 (relations 제거)
-    const scheduleData = this.sanitizeScheduleData(schedule);
+    const currentData = schedule.toSerializedData();
 
     const historyRecord = repository.create({
       scheduleUuid: schedule.uuid,
-      version: nextVersion,
-      scheduleData,
-      modifiedByUserUuid,
-      changeType,
+      currentData,
+      modifiedBy,
+      action,
     });
 
     return await repository.save(historyRecord);
-  }
-
-  /**
-   * 특정 스케줄의 다음 버전 번호 계산
-   */
-  private async getNextVersion(scheduleUuid: string, manager?: EntityManager): Promise<number> {
-    const repository = manager
-      ? manager.getRepository(ScheduleHistory)
-      : this.scheduleHistoryRepository;
-
-    const latestHistory = await repository.findOne({
-      where: { scheduleUuid },
-      order: { version: "DESC" },
-    });
-
-    return latestHistory ? latestHistory.version + 1 : 1;
-  }
-
-  /**
-   * 스케줄 데이터 정리 (relations 제거, 필요한 데이터만 보존)
-   */
-  private sanitizeScheduleData(schedule: Schedule): ScheduleHistoryData {
-    const { streamer, createdByUser, updatedByUser, ...scheduleData } = schedule;
-
-    return {
-      ...scheduleData,
-      // relations의 핵심 정보만 보존
-      streamerInfo: streamer
-        ? {
-            uuid: streamer.uuid,
-            name: streamer.name,
-          }
-        : null,
-      createdByUserInfo: createdByUser
-        ? {
-            uuid: createdByUser.uuid,
-            nickname: createdByUser.nickname,
-          }
-        : null,
-      updatedByUserInfo: updatedByUser
-        ? {
-            uuid: updatedByUser.uuid,
-            nickname: updatedByUser.nickname,
-          }
-        : null,
-    };
   }
 }

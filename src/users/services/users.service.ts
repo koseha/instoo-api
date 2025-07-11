@@ -34,9 +34,9 @@ export class UsersService {
   /**
    * 사용자 존재 여부 확인
    */
-  async exists(id: number): Promise<boolean> {
+  async exists(uuid: string): Promise<boolean> {
     const count = await this.userRepository.count({
-      where: { id, isActive: true },
+      where: { uuid, isActive: true },
     });
     return count > 0;
   }
@@ -89,14 +89,14 @@ export class UsersService {
   /**
    * 닉네임 중복 체크
    */
-  async isNicknameExists(nickname: string, excludeUserId?: number): Promise<boolean> {
+  async isNicknameExists(nickname: string, excludeUserId?: string): Promise<boolean> {
     const queryBuilder = this.userRepository
       .createQueryBuilder("user")
       .where("user.nickname = :nickname", { nickname })
       .andWhere("user.isActive = :isActive", { isActive: true });
 
     if (excludeUserId) {
-      queryBuilder.andWhere("user.id != :excludeUserId", { excludeUserId });
+      queryBuilder.andWhere("user.uuid != :excludeUserId", { excludeUserId });
     }
 
     const count = await queryBuilder.getCount();
@@ -113,7 +113,7 @@ export class UsersService {
     }
 
     // 닉네임 중복 확인
-    const isDuplicate = await this.isNicknameExists(newNickname, user.id);
+    const isDuplicate = await this.isNicknameExists(newNickname, user.uuid);
     if (isDuplicate) {
       throw new BadRequestException("이미 사용 중인 닉네임입니다");
     }

@@ -1,4 +1,5 @@
 // src/common/entities/base.entity.ts
+import { User } from "@/users/entities/user.entity";
 import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
@@ -9,7 +10,7 @@ import {
 
 export abstract class InstooBaseEntity {
   @PrimaryGeneratedColumn()
-  id: number;
+  idx: number;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
@@ -23,11 +24,15 @@ export abstract class InstooBaseEntity {
 
 // 생성자/수정자 정보가 필요한 엔티티용
 export abstract class BaseAuditEntity extends InstooBaseEntity {
-  @Column({ nullable: true })
-  createdBy?: number; // User ID
+  @Column({ type: "uuid" })
+  createdBy?: string; // User UUID
 
-  @Column({ nullable: true })
-  updatedBy?: number; // User ID
+  @Column({ type: "uuid" })
+  updatedBy?: string; // User UUID
+
+  // 관계 정의를 위한 추상 메서드 (하위 클래스에서 구현)
+  abstract createdByUser?: User;
+  abstract updatedByUser?: User;
 }
 
 // 버전 관리가 필요한 엔티티용 (스케줄 등)
