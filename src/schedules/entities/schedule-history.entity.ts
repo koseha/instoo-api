@@ -46,23 +46,4 @@ export class ScheduleHistory extends InstooBaseEntity {
   @ManyToOne(() => User, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "modifiedBy", referencedColumnName: "uuid" })
   modifiedByUser?: User;
-
-  // 히스토리 생성을 위한 정적 메서드
-  static createHistory(
-    scheduleUuid: string,
-    action: HistoryType,
-    modifiedBy: string,
-    currentData: SerializedScheduleData,
-    previousData?: SerializedScheduleData,
-  ): ScheduleHistory {
-    const history = new ScheduleHistory();
-
-    history.scheduleUuid = scheduleUuid;
-    history.action = action;
-    history.modifiedBy = modifiedBy;
-    history.currentData = currentData;
-    history.previousData = previousData;
-
-    return history;
-  }
 }

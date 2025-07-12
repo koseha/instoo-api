@@ -20,10 +20,9 @@ export class ScheduleHistoryService {
    * @param changeType 변경 타입
    * @param manager 트랜잭션 매니저 (선택사항)
    */
-  async createHistory(
+  async recordCreateWithTransaction(
     schedule: Schedule,
     modifiedBy: string,
-    action: HistoryType,
     manager?: EntityManager,
   ): Promise<ScheduleHistory> {
     const repository = manager
@@ -37,9 +36,34 @@ export class ScheduleHistoryService {
       scheduleUuid: schedule.uuid,
       currentData,
       modifiedBy,
-      action,
+      action: HistoryType.CREATE,
     });
 
     return await repository.save(historyRecord);
+  }
+
+  /**
+   *
+   * @param schedule
+   * @param modifiedBy
+   * @param action
+   * @param manager
+   * @returns
+   */
+  async recordUpdateWithTransaction(
+    entityManager: EntityManager,
+    schedule: Schedule,
+    previousSchedule: Schedule,
+    modifiedBy: string,
+  ): Promise<ScheduleHistory> {
+    const history = entityManager.create(ScheduleHistory, {
+      scheduleUuid: schedule.uuid,
+      action: HistoryType.UPDATE,
+      previousData: previousSchedule.toSerializedData(),
+      currentData: schedule.toSerializedData(),
+      modifiedBy,
+    });
+
+    return await entityManager.save(ScheduleHistory, history);
   }
 }

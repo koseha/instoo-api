@@ -74,7 +74,7 @@ export class SchedulesService {
         throw new BadRequestException("과거 날짜에는 일정을 생성할 수 없습니다.");
       }
 
-      // 4. 시작 시간 유효성 검사 (SCHEDULED 상태인 경우)
+      // 4. 시작 시간 유효성 검사 (SCHEDULED 상태인 경우) - 날짜만 검사
       if (createScheduleDto.startTime && createScheduleDto.status === ScheduleStatus.SCHEDULED) {
         const startTimeDate = new Date(createScheduleDto.startTime);
 
@@ -85,6 +85,8 @@ export class SchedulesService {
         if (startTimeDateString < today) {
           throw new BadRequestException("과거 날짜에는 일정을 생성할 수 없습니다.");
         }
+        if (createScheduleDto.scheduleDate !== startTimeDateString)
+          throw new BadRequestException("방송일과 방송시간의 일자가 다릅니다.");
       }
 
       // 5. 같은 날짜에 이미 일정이 있는지 확인 (간단한 문자열 비교)
@@ -121,6 +123,13 @@ export class SchedulesService {
 
       // 8. 저장
       const savedSchedule = await manager.save(Schedule, schedule);
+
+      // 9. 생성 이력 기록
+      await this.scheduleHistoryService.recordCreateWithTransaction(
+        savedSchedule,
+        userUuid,
+        manager,
+      );
 
       // 9. 관계 데이터와 함께 다시 조회
       const scheduleWithRelations = await manager.findOne(Schedule, {
@@ -162,10 +171,7 @@ export class SchedulesService {
     }
 
     // 정렬: 날짜 순, 시간 순
-    queryBuilder
-      .orderBy("schedule.scheduleDate", "ASC")
-      .addOrderBy("schedule.startTime", "ASC")
-      .addOrderBy("schedule.id", "ASC");
+    queryBuilder.orderBy("schedule.scheduleDate", "ASC").addOrderBy("schedule.startTime", "ASC");
 
     // 쿼리 실행
     const schedules = await queryBuilder.getMany();
@@ -283,6 +289,7 @@ export class SchedulesService {
       if (!existingSchedule) {
         throw new NotFoundException(`일정을 찾을 수 없습니다. (UUID: ${uuid})`);
       }
+      const previousSchedule = Object.assign(new Schedule(), existingSchedule);
 
       // 2. 사용자 존재 확인
       const user = await manager.findOne(User, {
@@ -302,14 +309,6 @@ export class SchedulesService {
           "다른 사용자가 이미 수정한 일정입니다. 최신 정보를 다시 확인해주세요.",
         );
       }
-
-      // 4. 📝 히스토리 기록 - 업데이트 전 현재 상태 저장
-      await this.scheduleHistoryService.createHistory(
-        existingSchedule,
-        userUuid,
-        HistoryType.CREATE,
-        manager,
-      );
 
       // 5. 업데이트할 필드들 준비
       const updateData: Partial<Schedule> = {
@@ -351,6 +350,8 @@ export class SchedulesService {
           if (startTimeDateString < today) {
             throw new BadRequestException("과거 날짜에는 일정을 설정할 수 없습니다.");
           }
+          if (startTimeDateString !== existingSchedule.scheduleDate)
+            throw new BadRequestException("방송일과 방송시간의 일자가 다릅니다.");
 
           updateData.startTime = startTimeDate;
         } else {
@@ -400,6 +401,14 @@ export class SchedulesService {
       if (!updatedSchedule) {
         throw new InternalServerErrorException("일정 업데이트 후 조회에 실패했습니다.");
       }
+
+      // 수정 이력 기록
+      await this.scheduleHistoryService.recordUpdateWithTransaction(
+        manager,
+        updatedSchedule,
+        previousSchedule,
+        userUuid,
+      );
 
       return ScheduleResponseDto.of(updatedSchedule);
     });

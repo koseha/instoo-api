@@ -70,7 +70,6 @@ export class SchedulesController {
     @Body() createScheduleDto: CreateScheduleDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<InstooApiResponse<ScheduleResponseDto>> {
-    console.log(createScheduleDto);
     const schedule = await this.schedulesService.create(createScheduleDto, req.user!.sub);
     return InstooApiResponse.success(schedule);
   }

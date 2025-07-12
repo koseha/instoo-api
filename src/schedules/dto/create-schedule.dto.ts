@@ -28,7 +28,7 @@ export class CreateScheduleDto {
 
   @ApiProperty({
     example: "2025-01-15",
-    description: "일정 날짜 (YYYY-MM-DD 형식) UTC",
+    description: "일정 날짜 (YYYY-MM-DD 형식) KST",
   })
   @IsDateString({}, { message: "올바른 날짜 형식이어야 합니다. (YYYY-MM-DD)" })
   scheduleDate: string;
