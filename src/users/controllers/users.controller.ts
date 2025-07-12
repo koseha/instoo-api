@@ -7,6 +7,7 @@ import { UserInfoDto } from "../dto/user-response.dto";
 import { UsersService } from "../services/users.service";
 import { UpdateProfileDto } from "../dto/update-profile.dto";
 import { UserErrorCode, AuthErrorCode } from "@/common/constants/api-error.enum";
+import { AuthInfo } from "@/auth/strategies/jwt.strategy";
 
 @ApiTags("Users")
 @Controller()
@@ -118,8 +119,8 @@ export class UsersController {
     @Body() updateProfileDto: UpdateProfileDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<InstooApiResponse<UserInfoDto>> {
-    const userId = req.user!.sub;
-    const user = await this.usersService.updateProfile(userId, updateProfileDto);
+    const currentUser: AuthInfo = req.user!;
+    const user = await this.usersService.updateProfile(currentUser, updateProfileDto);
     return InstooApiResponse.success(user);
   }
 }

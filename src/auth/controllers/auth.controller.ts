@@ -1,5 +1,5 @@
 import { Controller, Get, Query, Res, Post, Body } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { AuthService } from "../services/auth.service";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -156,6 +156,14 @@ export class AuthController {
     summary: "리프레시 토큰으로 액세스 토큰 재발급",
     description: "리프레시 토큰을 받아 새로운 액세스 토큰을 발급합니다.",
   })
+  @ApiBody({
+    description: "리프레시 토큰",
+    schema: {
+      example: {
+        refreshToken: "refresh-token",
+      },
+    },
+  })
   @ApiInstooResponses(Object, {
     success: {
       status: 200,
@@ -179,6 +187,7 @@ export class AuthController {
       },
     ],
   })
+  @ApiBearerAuth()
   async refreshToken(
     @Body("refreshToken") refreshToken: string,
   ): Promise<InstooApiResponse<{ accessToken: string; refreshToken?: string }>> {

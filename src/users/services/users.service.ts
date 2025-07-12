@@ -6,6 +6,7 @@ import { UserInfoDto } from "../dto/user-response.dto";
 import { UpdateProfileDto } from "../dto/update-profile.dto";
 import { ApiException, ApiNotFoundException } from "@/common/exceptions/api-exceptions";
 import { UserErrorCode } from "@/common/constants/api-error.enum";
+import { AuthInfo } from "@/auth/strategies/jwt.strategy";
 
 @Injectable()
 export class UsersService {
@@ -64,8 +65,8 @@ export class UsersService {
   /**
    * 사용자 프로필 수정
    */
-  async updateProfile(userId: string, updateData: UpdateProfileDto): Promise<UserInfoDto> {
-    const user = await this.findByUuid(userId);
+  async updateProfile(currentUser: AuthInfo, updateData: UpdateProfileDto): Promise<UserInfoDto> {
+    const { userUuid, nickname } = currentUser;
 
     // 업데이트할 데이터를 수집
     const updateFields: Partial<User> = {
@@ -73,7 +74,7 @@ export class UsersService {
     };
 
     if (updateData.nickname !== undefined) {
-      await this.validateNickname(updateData.nickname, user);
+      await this.validateNickname(updateData.nickname, nickname, userUuid);
       updateFields.nickname = updateData.nickname;
     }
 
@@ -83,9 +84,9 @@ export class UsersService {
       throw new ApiException(UserErrorCode.USER_NO_UPDATE_CONTENT);
     }
 
-    await this.userRepository.update({ uuid: userId, isActive: true }, updateFields);
+    await this.userRepository.update({ uuid: userUuid, isActive: true }, updateFields);
 
-    const updatedUser = await this.findByUuid(userId);
+    const updatedUser = await this.findByUuid(userUuid);
     return UserInfoDto.of(updatedUser);
   }
 
@@ -109,14 +110,14 @@ export class UsersService {
   /**
    * 닉네임 검증 (내부 메서드)
    */
-  private async validateNickname(newNickname: string, user: User): Promise<void> {
+  private async validateNickname(newNickname: string, nickname, userUuid): Promise<void> {
     // 현재 닉네임과 동일한지 확인
-    if (user.nickname === newNickname) {
+    if (nickname === newNickname) {
       throw new ApiException(UserErrorCode.USER_NICKNAME_SAME_AS_CURRENT);
     }
 
     // 닉네임 중복 확인
-    const isDuplicate = await this.isNicknameExists(newNickname, user.uuid);
+    const isDuplicate = await this.isNicknameExists(newNickname, userUuid);
     if (isDuplicate) {
       throw new ApiException(UserErrorCode.USER_NICKNAME_ALREADY_EXISTS);
     }

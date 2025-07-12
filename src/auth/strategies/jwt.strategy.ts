@@ -7,11 +7,14 @@ import { UserRole } from "@/common/constants/user-role.enum";
 
 export interface JwtPayload {
   sub: string; // user uuid
+  userUuid: string; // user uuid
   nickname: string;
   role: UserRole;
   iat?: number;
   exp?: number;
 }
+
+export type AuthInfo = Pick<JwtPayload, "userUuid" | "role" | "nickname">;
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
