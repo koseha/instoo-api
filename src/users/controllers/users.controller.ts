@@ -46,7 +46,7 @@ export class UsersController {
 
   @Get("v1/users/:uuid")
   @ApiOperation({
-    summary: "[관리자] 사용자 상세 조회",
+    summary: "사용자 상세 조회",
     description: "ID로 특정 사용자의 상세 정보를 조회합니다.",
   })
   @ApiInstooResponses(UserInfoDto, {
@@ -75,8 +75,7 @@ export class UsersController {
       },
     ],
   })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   async findById(@Param("uuid") uuid: string): Promise<InstooApiResponse<UserInfoDto>> {
     const user = await this.usersService.getMyProfile(uuid);
