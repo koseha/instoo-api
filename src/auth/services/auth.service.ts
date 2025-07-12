@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  BadRequestException,
-  InternalServerErrorException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { Repository } from "typeorm";
@@ -16,6 +11,12 @@ import axios from "axios";
 import { UserRole } from "@/common/constants/user-role.enum";
 import { UserInfoDto } from "@/users/dto/user-response.dto";
 import { JwtPayload } from "../strategies/jwt.strategy";
+import {
+  ApiException,
+  ApiUnauthorizedException,
+  ApiInternalServerException,
+} from "@/common/exceptions/api-exceptions";
+import { AuthErrorCode } from "@/common/constants/api-error.enum";
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -64,20 +65,25 @@ export class AuthService {
    * OAuth URL 생성 및 상태 저장
    */
   generateGoogleOAuthUrl(): string {
-    const state = this.generateRandomState();
-    const scope = "openid email profile";
+    try {
+      const state = this.generateRandomState();
+      const scope = "openid email profile";
 
-    const params = new URLSearchParams({
-      client_id: this.googleClientId,
-      redirect_uri: this.googleRedirectUri,
-      response_type: "code",
-      scope,
-      state,
-      access_type: "offline", // refresh token을 받기 위해
-      prompt: "consent", // 항상 동의 화면 표시 (refresh token 확보)
-    });
+      const params = new URLSearchParams({
+        client_id: this.googleClientId,
+        redirect_uri: this.googleRedirectUri,
+        response_type: "code",
+        scope,
+        state,
+        access_type: "offline", // refresh token을 받기 위해
+        prompt: "consent", // 항상 동의 화면 표시 (refresh token 확보)
+      });
 
-    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    } catch (error) {
+      console.error("OAuth URL generation error:", error);
+      throw new ApiException(AuthErrorCode.AUTH_URL_GENERATION_FAILED);
+    }
   }
 
   /**
@@ -93,7 +99,7 @@ export class AuthService {
 
       // 사용자 정보 검증
       if (!googleUser.verified_email) {
-        throw new UnauthorizedException("이메일이 인증되지 않은 Google 계정입니다.");
+        throw new ApiUnauthorizedException(AuthErrorCode.AUTH_EMAIL_NOT_VERIFIED);
       }
 
       // 사용자 정보 저장/업데이트 및 JWT 토큰 생성
@@ -110,15 +116,15 @@ export class AuthService {
       console.error("Google OAuth processing error:", error);
 
       if (axios.isAxiosError(error) && error.response?.status === 400) {
-        throw new BadRequestException("Google 토큰 교환에 실패했습니다.");
+        throw new ApiException(AuthErrorCode.AUTH_TOKEN_EXCHANGE_FAILED);
       }
 
       // 이미 처리된 예외인 경우 그대로 throw
-      if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+      if (error instanceof ApiUnauthorizedException || error instanceof ApiException) {
         throw error;
       }
 
-      throw new InternalServerErrorException("OAuth 처리 중 알 수 없는 오류가 발생했습니다.");
+      throw new ApiInternalServerException(AuthErrorCode.AUTH_OAUTH_PROCESSING_ERROR);
     }
   }
 
@@ -150,7 +156,7 @@ export class AuthService {
       } else {
         console.error("Unknown error:", error);
       }
-      throw new BadRequestException("Google 토큰 교환에 실패했습니다.");
+      throw new ApiException(AuthErrorCode.AUTH_TOKEN_EXCHANGE_FAILED);
     }
   }
 
@@ -174,7 +180,7 @@ export class AuthService {
       } else {
         console.error("Unknown error:", error);
       }
-      throw new UnauthorizedException("Google 사용자 정보를 가져올 수 없습니다.");
+      throw new ApiUnauthorizedException(AuthErrorCode.AUTH_USER_INFO_FAILED);
     }
   }
 
@@ -249,7 +255,7 @@ export class AuthService {
       const decoded = this.jwtService.verify<RefreshTokenPayload>(refreshToken);
 
       if (decoded.type !== "refresh") {
-        throw new UnauthorizedException("유효하지 않은 리프레시 토큰입니다.");
+        throw new ApiUnauthorizedException(AuthErrorCode.AUTH_INVALID_REFRESH_TOKEN);
       }
 
       const user = await this.userRepository.findOne({
@@ -257,7 +263,7 @@ export class AuthService {
       });
 
       if (!user) {
-        throw new UnauthorizedException("사용자를 찾을 수 없습니다.");
+        throw new ApiUnauthorizedException(AuthErrorCode.AUTH_USER_NOT_FOUND);
       }
 
       const tokens = this.generateJwtTokens(user);
@@ -271,13 +277,13 @@ export class AuthService {
     } catch (error) {
       if (error instanceof Error) {
         if (error.name === "TokenExpiredError") {
-          throw new UnauthorizedException("리프레시 토큰이 만료되었습니다.");
+          throw new ApiUnauthorizedException(AuthErrorCode.AUTH_REFRESH_TOKEN_EXPIRED);
         }
-        if (error instanceof UnauthorizedException) {
+        if (error instanceof ApiUnauthorizedException) {
           throw error;
         }
       }
-      throw new UnauthorizedException("유효하지 않은 리프레시 토큰입니다.");
+      throw new ApiUnauthorizedException(AuthErrorCode.AUTH_INVALID_REFRESH_TOKEN);
     }
   }
 
@@ -290,7 +296,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException("사용자를 찾을 수 없습니다.");
+      throw new ApiUnauthorizedException(AuthErrorCode.AUTH_USER_NOT_FOUND);
     }
 
     return user;

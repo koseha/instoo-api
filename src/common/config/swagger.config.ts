@@ -28,7 +28,6 @@ export function setupSwagger(app: INestApplication): void {
       "success": true,
       "message": "요청이 성공적으로 처리되었습니다.",
       "data": {...},
-      "timestamp": "2025-01-01T00:00:00.000Z"
     }
     \`\`\`
     

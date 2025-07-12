@@ -1,27 +1,28 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { ApiErrorCode } from "../constants/api-error.enum";
 
 export class InstooApiResponse<T> {
-  @ApiProperty({ example: 200, description: "HTTP 상태 코드" })
-  readonly code: number;
-
-  @ApiProperty({ example: "해당 이메일은 이미 존재합니다.", description: "에러 메시지" })
-  readonly message: string | null;
+  @ApiProperty({
+    description: "에러 코드",
+    nullable: true,
+    example: null,
+  })
+  readonly code: ApiErrorCode | null;
 
   @ApiProperty({ description: "응답 본문" })
   readonly content: T | null;
 
-  constructor(code: number, message: string | null, content: T | null) {
+  constructor(code: ApiErrorCode | null, content: T | null) {
     this.code = code;
-    this.message = message;
     this.content = content;
   }
 
-  static success<T>(content: T, message: string | null = null, code = 200): InstooApiResponse<T> {
-    return new InstooApiResponse<T>(code, message, content);
+  static success<T>(content: T): InstooApiResponse<T> {
+    return new InstooApiResponse<T>(null, content);
   }
 
-  static error(message: string, code = 400): InstooApiResponse<null> {
-    return new InstooApiResponse<null>(code, message, null);
+  static error(code: ApiErrorCode): InstooApiResponse<null> {
+    return new InstooApiResponse<null>(code, null);
   }
 }
 

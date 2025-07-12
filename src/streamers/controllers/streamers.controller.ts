@@ -11,7 +11,6 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  ParseIntPipe,
   Req,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from "@nestjs/swagger";
@@ -27,16 +26,17 @@ import {
 } from "../dto/streamer-response.dto";
 import { InstooApiResponse } from "@/common/dto/instoo-api-response.dto";
 import {
-  ApiInstooResponse,
-  ApiInstooErrorResponse,
-  ApiInstooResponses,
   ApiInstooArrayResponse,
+  ApiInstooErrorResponse,
+  ApiInstooResponse,
+  ApiInstooResponses,
   ApiInstooSimpleResponses,
 } from "@/common/decorators/api-response.decorator";
 import { AuthenticatedRequest, JwtAuthGuard } from "@/auth/guard/jwt-auth.guard";
 import { RolesGuard } from "@/auth/guard/role.guard";
 import { Roles } from "@/auth/decorators/roles.decorator";
 import { UserRole } from "@/common/constants/user-role.enum";
+import { StreamerErrorCode, AuthErrorCode, UserErrorCode } from "@/common/constants/api-error.enum";
 
 @ApiTags("Streamers")
 @Controller()
@@ -44,28 +44,35 @@ export class StreamersController {
   constructor(private readonly streamersService: StreamersService) {}
 
   /**
-   *
+   * 방송인 생성
    */
   @Post("v1/streamers")
   @ApiOperation({
     summary: "방송인 생성",
     description: "새로운 방송인을 생성합니다. 인증된 사용자만 생성할 수 있습니다.",
   })
-  @ApiInstooResponse(StreamerResponseDto, {
-    status: 201,
-    description: "방송인 생성 성공",
-  })
-  @ApiInstooErrorResponse(400, "잘못된 요청", {
-    code: "BAD_REQUEST",
-    message: "요청 데이터가 올바르지 않습니다.",
-  })
-  @ApiInstooErrorResponse(401, "인증 실패", {
-    code: "UNAUTHORIZED",
-    message: "인증이 필요합니다.",
-  })
-  @ApiInstooErrorResponse(409, "중복된 방송인", {
-    code: "STREAMER_ALREADY_EXISTS",
-    message: "해당 이름과 플랫폼 조합의 방송인이 이미 존재합니다.",
+  @ApiInstooResponses(StreamerResponseDto, {
+    success: {
+      status: 201,
+      description: "방송인 생성 성공",
+    },
+    errors: [
+      {
+        status: 401,
+        code: AuthErrorCode.AUTH_UNAUTHORIZED,
+        description: "인증이 필요합니다.",
+      },
+      {
+        status: 404,
+        code: UserErrorCode.USER_NOT_FOUND,
+        description: "사용자를 찾을 수 없습니다.",
+      },
+      {
+        status: 409,
+        code: StreamerErrorCode.STREAMER_ALREADY_EXISTS,
+        description: "방송인이 플랫폼에 이미 존재합니다.",
+      },
+    ],
   })
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -74,11 +81,11 @@ export class StreamersController {
     @Req() req: AuthenticatedRequest,
   ): Promise<InstooApiResponse<StreamerResponseDto>> {
     const streamer = await this.streamersService.create(createStreamerDto, req.user!.sub);
-    return InstooApiResponse.success(streamer, "방송인이 성공적으로 생성되었습니다.");
+    return InstooApiResponse.success(streamer);
   }
 
   /**
-   *
+   * 방송인 목록 조회
    */
   @Post("v1/streamers/list")
   @ApiOperation({
@@ -97,20 +104,19 @@ export class StreamersController {
   }
 
   /**
-   *
+   * 방송인 간편 검색
    */
   @Get("v1/streamers/search")
   @ApiOperation({
-    summary: "방송인 간편 검색 - 조회",
+    summary: "방송인 간편 검색",
     description: "방송인 이름으로 검색하여 해당하는 방송인들의 목록을 조회합니다.",
   })
   @ApiInstooArrayResponse(StreamerSearchDto, {
     status: 200,
     description: "자동완성 검색 성공",
   })
-  @ApiInstooErrorResponse(400, "잘못된 요청", {
-    code: "BAD_REQUEST",
-    message: "검색어는 최소 2글자 이상이어야 합니다.",
+  @ApiInstooErrorResponse(400, "검색어는 최소 2글자 이상이어야 합니다.", {
+    code: StreamerErrorCode.STREAMER_SEARCH_TERM_TOO_SHORT,
   })
   async search(@Query("qName") qName: string): Promise<InstooApiResponse<StreamerSearchDto[]>> {
     const result = await this.streamersService.searchStreamersByName(qName);
@@ -118,7 +124,7 @@ export class StreamersController {
   }
 
   /**
-   *
+   * 방송인 상세 조회
    */
   @Get("v1/streamers/:uuid")
   @ApiOperation({
@@ -134,19 +140,18 @@ export class StreamersController {
     errors: [
       {
         status: 404,
-        description: "방송인을 찾을 수 없음",
-        code: "STREAMER_NOT_FOUND",
-        message: "해당 방송인을 찾을 수 없습니다.",
+        code: StreamerErrorCode.STREAMER_NOT_FOUND,
+        description: "방송인을 찾을 수 없습니다.",
       },
     ],
   })
   async findOne(@Param("uuid") uuid: string): Promise<InstooApiResponse<StreamerResponseDto>> {
     const streamer = await this.streamersService.findByUuid(uuid);
-    return InstooApiResponse.success(streamer, "방송인 정보를 성공적으로 조회했습니다.");
+    return InstooApiResponse.success(streamer);
   }
 
   /**
-   *
+   * 방송인 정보 수정
    */
   @Patch("v1/streamers/:uuid")
   @ApiOperation({
@@ -162,28 +167,29 @@ export class StreamersController {
     },
     errors: [
       {
-        status: 400,
-        description: "잘못된 요청",
-        code: "BAD_REQUEST",
-        message: "요청 데이터가 올바르지 않습니다.",
-      },
-      {
         status: 401,
-        description: "인증 실패",
-        code: "UNAUTHORIZED",
-        message: "인증이 필요합니다.",
+        code: AuthErrorCode.AUTH_UNAUTHORIZED,
+        description: "인증이 필요합니다.",
       },
       {
         status: 404,
-        description: "방송인을 찾을 수 없음",
-        code: "STREAMER_NOT_FOUND",
-        message: "해당 방송인을 찾을 수 없습니다.",
+        code: UserErrorCode.USER_NOT_FOUND,
+        description: "사용자를 찾을 수 없습니다.",
+      },
+      {
+        status: 404,
+        code: StreamerErrorCode.STREAMER_NOT_FOUND,
+        description: "방송인을 찾을 수 없습니다.",
       },
       {
         status: 409,
-        description: "충돌 발생",
-        code: "CONFLICT",
-        message: "방송인 정보가 다른 사용자에 의해 수정되었습니다.",
+        code: StreamerErrorCode.STREAMER_CONFLICT_MODIFIED,
+        description: "다른 사용자가 이미 수정한 방송인입니다.",
+      },
+      {
+        status: 409,
+        code: StreamerErrorCode.STREAMER_NAME_ALREADY_EXISTS,
+        description: "방송인 이름이 이미 존재합니다.",
       },
     ],
   })
@@ -200,11 +206,11 @@ export class StreamersController {
       req.user!.sub,
       req.user!.role,
     );
-    return InstooApiResponse.success(streamer, "방송인 정보를 성공적으로 수정했습니다.");
+    return InstooApiResponse.success(streamer);
   }
 
   /**
-   *
+   * [관리자] 방송인 인증 상태 변경
    */
   @Patch("v1/streamers/:uuid/verify")
   @ApiOperation({
@@ -220,21 +226,18 @@ export class StreamersController {
     errors: [
       {
         status: 401,
-        description: "인증 실패",
-        code: "UNAUTHORIZED",
-        message: "인증이 필요합니다.",
+        code: AuthErrorCode.AUTH_UNAUTHORIZED,
+        description: "인증이 필요합니다.",
       },
       {
         status: 403,
-        description: "권한 없음",
-        code: "FORBIDDEN",
-        message: "관리자만 방송인 인증 상태를 변경할 수 있습니다.",
+        code: AuthErrorCode.AUTH_UNAUTHORIZED,
+        description: "관리자 권한이 필요합니다.",
       },
       {
         status: 404,
-        description: "방송인을 찾을 수 없음",
-        code: "STREAMER_NOT_FOUND",
-        message: "해당 방송인을 찾을 수 없습니다.",
+        code: StreamerErrorCode.STREAMER_NOT_FOUND,
+        description: "방송인을 찾을 수 없습니다.",
       },
     ],
   })
@@ -246,45 +249,18 @@ export class StreamersController {
     @Body() verifyDto: VerifyStreamerDto,
   ): Promise<InstooApiResponse<StreamerResponseDto>> {
     const streamer = await this.streamersService.verifyStreamer(uuid, verifyDto.isVerified);
-    const message = verifyDto.isVerified
-      ? "방송인이 성공적으로 인증되었습니다."
-      : "방송인 인증이 해제되었습니다.";
-    return InstooApiResponse.success(streamer, message);
+    return InstooApiResponse.success(streamer);
   }
 
   /**
-   *
+   * [관리자] 방송인 삭제
    */
-  @Get("uuid/:uuid")
+  @Delete("v1/streamers/:uuid")
   @ApiOperation({
-    summary: "❌ 방송인 UUID로 조회",
-    description: "UUID로 특정 방송인의 상세 정보를 조회합니다.",
-  })
-  @ApiParam({ name: "uuid", description: "방송인 UUID" })
-  @ApiInstooResponses(StreamerResponseDto, {
-    success: {
-      status: 200,
-      description: "방송인 조회 성공",
-    },
-    errors: [
-      {
-        status: 404,
-        description: "방송인을 찾을 수 없음",
-        code: "STREAMER_NOT_FOUND",
-        message: "해당 방송인을 찾을 수 없습니다.",
-      },
-    ],
-  })
-  async findByUuid(@Param("uuid") uuid: string): Promise<InstooApiResponse<StreamerResponseDto>> {
-    const streamer = await this.streamersService.findByUuid(uuid);
-    return InstooApiResponse.success(streamer, "방송인 정보를 성공적으로 조회했습니다.");
-  }
-
-  @Delete(":uuid")
-  @ApiOperation({
-    summary: "❌ 방송인 삭제",
+    summary: "[관리자] 방송인 삭제",
     description: "방송인을 삭제합니다. 관리자만 삭제할 수 있습니다.",
   })
+  @ApiParam({ name: "uuid", description: "방송인 UUID" })
   @ApiInstooSimpleResponses({
     success: {
       status: 204,
@@ -293,21 +269,18 @@ export class StreamersController {
     errors: [
       {
         status: 401,
-        description: "인증 실패",
-        code: "UNAUTHORIZED",
-        message: "인증이 필요합니다.",
+        code: AuthErrorCode.AUTH_UNAUTHORIZED,
+        description: "인증이 필요합니다.",
       },
       {
         status: 403,
-        description: "권한 없음",
-        code: "FORBIDDEN",
-        message: "관리자만 방송인을 삭제할 수 있습니다.",
+        code: StreamerErrorCode.STREAMER_DELETE_ADMIN_ONLY,
+        description: "관리자만 방송인을 삭제할 수 있습니다.",
       },
       {
         status: 404,
-        description: "방송인을 찾을 수 없음",
-        code: "STREAMER_NOT_FOUND",
-        message: "해당 방송인을 찾을 수 없습니다.",
+        code: StreamerErrorCode.STREAMER_NOT_FOUND,
+        description: "방송인을 찾을 수 없습니다.",
       },
     ],
   })

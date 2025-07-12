@@ -1,9 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { User } from "../entities/user.entity";
 import { Repository } from "typeorm";
 import { UserInfoDto } from "../dto/user-response.dto";
 import { UpdateProfileDto } from "../dto/update-profile.dto";
+import { ApiException, ApiNotFoundException } from "@/common/exceptions/api-exceptions";
+import { UserErrorCode } from "@/common/constants/api-error.enum";
 
 @Injectable()
 export class UsersService {
@@ -13,20 +15,21 @@ export class UsersService {
   ) {}
 
   /**
-   * 이메일로 사용자 조회 (인증용)
+   * UUID로 사용자 조회 (인증용)
    */
   async findByUuid(uuid: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { uuid, isActive: true },
     });
-    if (!user) throw new NotFoundException("사용자가 없습니다");
+    if (!user) {
+      throw new ApiNotFoundException(UserErrorCode.USER_NOT_FOUND);
+    }
     return user;
   }
-
   /**
-   * 현재 로그인한 사용자 정보 조회
+   * UUID로 사용자 정보 조회 (컨트롤러의 findById용)
    */
-  async getMyProfile(userId: string): Promise<UserInfoDto> {
+  async getUserByUuid(userId: string): Promise<UserInfoDto> {
     const user = await this.findByUuid(userId);
     return UserInfoDto.of(user);
   }
@@ -77,7 +80,7 @@ export class UsersService {
     // 실제 업데이트할 필드가 있는지 확인
     const hasUpdates = Object.keys(updateFields).length > 1; // updatedAt 제외
     if (!hasUpdates) {
-      throw new BadRequestException("수정할 내용이 없습니다");
+      throw new ApiException(UserErrorCode.USER_NO_UPDATE_CONTENT);
     }
 
     await this.userRepository.update({ uuid: userId, isActive: true }, updateFields);
@@ -109,13 +112,13 @@ export class UsersService {
   private async validateNickname(newNickname: string, user: User): Promise<void> {
     // 현재 닉네임과 동일한지 확인
     if (user.nickname === newNickname) {
-      throw new BadRequestException("현재 닉네임과 동일합니다");
+      throw new ApiException(UserErrorCode.USER_NICKNAME_SAME_AS_CURRENT);
     }
 
     // 닉네임 중복 확인
     const isDuplicate = await this.isNicknameExists(newNickname, user.uuid);
     if (isDuplicate) {
-      throw new BadRequestException("이미 사용 중인 닉네임입니다");
+      throw new ApiException(UserErrorCode.USER_NICKNAME_ALREADY_EXISTS);
     }
   }
 }

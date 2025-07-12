@@ -1,11 +1,5 @@
 // src/streamers/services/streamers.service.ts
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  ForbiddenException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, EntityManager, Repository } from "typeorm";
 import { Streamer } from "../entities/streamer.entity";
@@ -21,6 +15,13 @@ import {
 } from "../dto/streamer-response.dto";
 import { UserRole } from "@/common/constants/user-role.enum";
 import { StreamerHistoryService } from "./streamer-history.service";
+import {
+  ApiException,
+  ApiNotFoundException,
+  ApiConflictException,
+  ApiForbiddenException,
+} from "@/common/exceptions/api-exceptions";
+import { StreamerErrorCode, UserErrorCode } from "@/common/constants/api-error.enum";
 
 @Injectable()
 export class StreamersService {
@@ -46,14 +47,13 @@ export class StreamersService {
       // 트랜잭션 내에서 사용할 repository들
       const userRepository = manager.getRepository(User);
       const streamerRepository = manager.getRepository(Streamer);
-      const streamerPlatformRepository = manager.getRepository(StreamerPlatform);
 
       // 사용자 조회
       const user = await userRepository.findOne({
         where: { uuid: userUuid, isActive: true },
       });
       if (!user) {
-        throw new NotFoundException("사용자를 찾을 수 없습니다.");
+        throw new ApiNotFoundException(UserErrorCode.USER_NOT_FOUND);
       }
 
       // 중복 확인: 이름과 플랫폼 조합으로 체크
@@ -65,9 +65,7 @@ export class StreamersService {
             manager,
           );
           if (existingStreamer) {
-            throw new ConflictException(
-              `방송인 "${createStreamerDto.name}"이 플랫폼 "${platformDto.platformName}"에 이미 존재합니다.`,
-            );
+            throw new ApiConflictException(StreamerErrorCode.STREAMER_ALREADY_EXISTS);
           }
         }
       }
@@ -121,7 +119,7 @@ export class StreamersService {
     });
 
     if (!streamer) {
-      throw new NotFoundException("방송인을 찾을 수 없습니다.");
+      throw new ApiNotFoundException(StreamerErrorCode.STREAMER_NOT_FOUND);
     }
 
     return StreamerResponseDto.of(streamer); // 또는 적절한 DTO 변환
@@ -131,8 +129,9 @@ export class StreamersService {
    * 방송인 목록 조회 - 간편 검색
    */
   async searchStreamersByName(qName: string): Promise<StreamerSearchDto[]> {
-    if (!qName || qName.trim().length < 2)
-      throw new BadRequestException("검색어는 최소 2글자 이상이어야 합니다.");
+    if (!qName || qName.trim().length < 2) {
+      throw new ApiException(StreamerErrorCode.STREAMER_SEARCH_TERM_TOO_SHORT);
+    }
 
     const queryBuilder = this.streamerRepository
       .createQueryBuilder("streamer")
@@ -233,7 +232,7 @@ export class StreamersService {
     });
 
     if (!streamer) {
-      throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
+      throw new ApiNotFoundException(StreamerErrorCode.STREAMER_NOT_FOUND);
     }
 
     return this.toResponseDto(streamer);
@@ -254,7 +253,7 @@ export class StreamersService {
         where: { uuid: userUuid, isActive: true },
       });
       if (!user) {
-        throw new NotFoundException("사용자를 찾을 수 없습니다.");
+        throw new ApiNotFoundException(UserErrorCode.USER_NOT_FOUND);
       }
 
       // 기존 방송인 정보 조회 (이력 기록용)
@@ -265,7 +264,7 @@ export class StreamersService {
       const previousStreamer = Object.assign(new Streamer(), existingStreamer);
 
       if (!existingStreamer) {
-        throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
+        throw new ApiNotFoundException(StreamerErrorCode.STREAMER_NOT_FOUND);
       }
 
       // 충돌 방지: updatedAt 체크
@@ -273,9 +272,7 @@ export class StreamersService {
       const currentLastUpdatedAt = existingStreamer.updatedAt;
 
       if (requestLastUpdatedAt.getTime() !== currentLastUpdatedAt.getTime()) {
-        throw new ConflictException(
-          `방송인 정보가 다른 사용자에 의해 수정되었습니다. 최신 정보를 다시 불러온 후 수정해주세요.`,
-        );
+        throw new ApiConflictException(StreamerErrorCode.STREAMER_CONFLICT_MODIFIED);
       }
 
       // 이름 변경 시 중복 확인
@@ -284,7 +281,7 @@ export class StreamersService {
           where: { name: updateStreamerDto.name, isActive: true },
         });
         if (duplicateStreamer && duplicateStreamer.uuid !== uuid) {
-          throw new ConflictException(`방송인 이름 "${updateStreamerDto.name}"이 이미 존재합니다.`);
+          throw new ApiConflictException(StreamerErrorCode.STREAMER_NAME_ALREADY_EXISTS);
         }
       }
 
@@ -337,7 +334,7 @@ export class StreamersService {
   async remove(uuid: string, userUuid: string, userRole: UserRole): Promise<void> {
     // 권한 확인
     if (userRole !== UserRole.ADMIN) {
-      throw new ForbiddenException("관리자만 방송인을 삭제할 수 있습니다.");
+      throw new ApiForbiddenException(StreamerErrorCode.STREAMER_DELETE_ADMIN_ONLY);
     }
 
     // 방송인 조회
@@ -346,7 +343,7 @@ export class StreamersService {
     });
 
     if (!streamer) {
-      throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
+      throw new ApiNotFoundException(StreamerErrorCode.STREAMER_NOT_FOUND);
     }
 
     // Soft delete
@@ -369,7 +366,7 @@ export class StreamersService {
     });
 
     if (!streamer) {
-      throw new NotFoundException(`방송인을 찾을 수 없습니다. (UUID: ${uuid})`);
+      throw new ApiNotFoundException(StreamerErrorCode.STREAMER_NOT_FOUND);
     }
 
     streamer.isVerified = isVerified;

@@ -3,12 +3,18 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { AuthService } from "../services/auth.service";
 import { ConfigService } from "@nestjs/config";
 import {
-  ApiInstooErrorResponse,
-  ApiInstooResponse,
+  ApiInstooResponses,
+  ApiInstooSimpleResponse,
 } from "@/common/decorators/api-response.decorator";
 import { InstooApiResponse } from "@/common/dto/instoo-api-response.dto";
 import { OAuthUrlResponseDto } from "../dto/auth-response.dto";
 import { Response } from "express";
+import { AuthErrorCode } from "@/common/constants/api-error.enum";
+import {
+  ApiException,
+  ApiInternalServerException,
+  ApiUnauthorizedException,
+} from "@/common/exceptions/api-exceptions";
 
 @ApiTags("Authentication")
 @Controller()
@@ -27,19 +33,24 @@ export class AuthController {
     summary: "Google OAuth 로그인 URL 생성",
     description: "프론트엔드에서 사용할 Google OAuth 인증 URL을 생성합니다.",
   })
-  @ApiInstooResponse(OAuthUrlResponseDto, {
-    status: 200,
-    description: "OAuth URL 생성 성공",
-  })
-  @ApiInstooErrorResponse(500, "서버 내부 오류", {
-    code: "OAUTH_URL_GENERATION_FAILED",
-    message: "OAuth URL 생성 중 오류가 발생했습니다.",
+  @ApiInstooResponses(OAuthUrlResponseDto, {
+    success: {
+      status: 200,
+      description: "OAuth URL 생성 성공",
+    },
+    errors: [
+      {
+        status: 500,
+        code: AuthErrorCode.AUTH_URL_GENERATION_FAILED,
+        description: "OAuth URL 생성 중 오류가 발생했습니다.",
+      },
+    ],
   })
   getGoogleLoginUrl(): InstooApiResponse<OAuthUrlResponseDto> {
     const oauthUrl = this.authService.generateGoogleOAuthUrl();
     const data = new OAuthUrlResponseDto(oauthUrl);
 
-    return InstooApiResponse.success(data, "Google OAuth URL이 성공적으로 생성되었습니다.");
+    return InstooApiResponse.success(data);
   }
 
   /**
@@ -65,14 +76,21 @@ export class AuthController {
       if (error) {
         console.error("OAuth Error:", error);
         return res.redirect(
-          `${frontendErrorUrl}?error=${encodeURIComponent(error)}&message=${encodeURIComponent("OAuth 인증이 거부되었습니다.")}`,
+          `${frontendErrorUrl}?errorCode=${AuthErrorCode.AUTH_PROVIDER_ERROR}&message=${encodeURIComponent("OAuth 인증이 거부되었습니다.")}`,
         );
       }
 
       // 인증 코드가 없는 경우
       if (!code) {
         return res.redirect(
-          `${frontendErrorUrl}?error=missing_code&message=${encodeURIComponent("인증 코드가 누락되었습니다.")}`,
+          `${frontendErrorUrl}?errorCode=${AuthErrorCode.AUTH_TOKEN_EXCHANGE_FAILED}&message=${encodeURIComponent("인증 코드가 누락되었습니다.")}`,
+        );
+      }
+
+      // 상태값 검증 (필요시)
+      if (!state) {
+        return res.redirect(
+          `${frontendErrorUrl}?errorCode=${AuthErrorCode.AUTH_INVALID_STATE}&message=${encodeURIComponent("상태값이 누락되었습니다.")}`,
         );
       }
 
@@ -86,25 +104,45 @@ export class AuthController {
     } catch (error) {
       console.error("Google OAuth Callback Error:", error);
 
-      // 에러 타입에 따른 구체적인 에러 메시지
-      let errorMessage = "로그인 처리 중 오류가 발생했습니다.";
-      let errorCode = "auth_failed";
+      // 커스텀 예외의 에러 코드 추출
+      let errorCode = AuthErrorCode.AUTH_OAUTH_PROCESSING_ERROR;
+      let message = "로그인 처리 중 오류가 발생했습니다.";
 
-      if (error instanceof Error) {
-        if (error.message.includes("user_not_found")) {
-          errorMessage = "사용자 정보를 찾을 수 없습니다.";
-          errorCode = "user_not_found";
-        } else if (error.message.includes("token_exchange_failed")) {
-          errorMessage = "토큰 교환에 실패했습니다.";
-          errorCode = "token_exchange_failed";
-        } else if (error.message.includes("invalid_state")) {
-          errorMessage = "유효하지 않은 요청입니다.";
-          errorCode = "invalid_state";
+      // ApiException 계열의 에러인 경우 에러 코드 추출
+      if (
+        error instanceof ApiUnauthorizedException ||
+        error instanceof ApiException ||
+        error instanceof ApiInternalServerException
+      ) {
+        const response = error.getResponse() as { code: AuthErrorCode };
+        errorCode = response.code;
+
+        // 에러 코드에 따른 사용자 친화적 메시지
+        switch (errorCode) {
+          case AuthErrorCode.AUTH_EMAIL_NOT_VERIFIED:
+            message = "이메일이 인증되지 않은 Google 계정입니다.";
+            break;
+          case AuthErrorCode.AUTH_TOKEN_EXCHANGE_FAILED:
+            message = "Google 토큰 교환에 실패했습니다.";
+            break;
+          case AuthErrorCode.AUTH_USER_INFO_FAILED:
+            message = "Google 사용자 정보를 가져올 수 없습니다.";
+            break;
+          case AuthErrorCode.AUTH_INVALID_STATE:
+            message = "상태값 검증에 실패했습니다.";
+            break;
+          case AuthErrorCode.AUTH_PROVIDER_ERROR:
+            message = "소셜 로그인 제공자 오류가 발생했습니다.";
+            break;
+          case AuthErrorCode.AUTH_OAUTH_PROCESSING_ERROR:
+          default:
+            message = "OAuth 처리 중 알 수 없는 오류가 발생했습니다.";
+            break;
         }
       }
 
       return res.redirect(
-        `${frontendErrorUrl}?error=${errorCode}&message=${encodeURIComponent(errorMessage)}`,
+        `${frontendErrorUrl}?errorCode=${errorCode}&message=${encodeURIComponent(message)}`,
       );
     }
   }
@@ -118,19 +156,34 @@ export class AuthController {
     summary: "리프레시 토큰으로 액세스 토큰 재발급",
     description: "리프레시 토큰을 받아 새로운 액세스 토큰을 발급합니다.",
   })
-  @ApiInstooResponse(Object, {
-    status: 200,
-    description: "토큰 재발급 성공",
-  })
-  @ApiInstooErrorResponse(400, "잘못된 요청", {
-    code: "BAD_REQUEST",
-    message: "리프레시 토큰이 유효하지 않습니다.",
+  @ApiInstooResponses(Object, {
+    success: {
+      status: 200,
+      description: "토큰 재발급 성공",
+    },
+    errors: [
+      {
+        status: 400,
+        code: AuthErrorCode.AUTH_INVALID_REFRESH_TOKEN,
+        description: "리프레시 토큰이 유효하지 않습니다.",
+      },
+      {
+        status: 401,
+        code: AuthErrorCode.AUTH_REFRESH_TOKEN_EXPIRED,
+        description: "리프레시 토큰이 만료되었습니다.",
+      },
+      {
+        status: 401,
+        code: AuthErrorCode.AUTH_USER_NOT_FOUND,
+        description: "사용자를 찾을 수 없습니다.",
+      },
+    ],
   })
   async refreshToken(
     @Body("refreshToken") refreshToken: string,
   ): Promise<InstooApiResponse<{ accessToken: string; refreshToken?: string }>> {
     const result = await this.authService.refreshToken(refreshToken);
-    return InstooApiResponse.success(result, "토큰이 성공적으로 재발급되었습니다.");
+    return InstooApiResponse.success(result);
   }
 
   /**
@@ -142,16 +195,12 @@ export class AuthController {
     summary: "로그아웃",
     description: "리프레시 토큰을 무효화(블랙리스트 처리 등)합니다.",
   })
-  @ApiInstooResponse(Object, {
+  @ApiInstooSimpleResponse({
     status: 200,
     description: "로그아웃 성공",
   })
-  @ApiInstooErrorResponse(400, "잘못된 요청", {
-    code: "BAD_REQUEST",
-    message: "리프레시 토큰이 유효하지 않습니다.",
-  })
-  async logout(@Body("refreshToken") refreshToken: string): Promise<InstooApiResponse<null>> {
-    this.authService.invalidateToken(refreshToken);
-    return Promise.resolve(InstooApiResponse.success(null, "로그아웃 되었습니다."));
+  logout(@Body("refreshToken") refreshToken: string): InstooApiResponse<null> {
+    this.authService.invalidateToken(refreshToken); // await 추가
+    return InstooApiResponse.success(null);
   }
 }

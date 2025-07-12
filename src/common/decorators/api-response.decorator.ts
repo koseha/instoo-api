@@ -1,6 +1,7 @@
 import { applyDecorators, Type } from "@nestjs/common";
 import { ApiResponse, ApiExtraModels, getSchemaPath } from "@nestjs/swagger";
 import { InstooApiResponse, PagedResponse } from "../dto/instoo-api-response.dto";
+import { ApiErrorCode } from "../constants/api-error.enum";
 
 // 옵션 인터페이스들
 interface ApiInstooResponseOptions {
@@ -9,13 +10,12 @@ interface ApiInstooResponseOptions {
 }
 
 interface ApiInstooErrorOptions {
-  code: string;
-  message: string;
+  code: ApiErrorCode;
+  description?: string;
 }
 
 interface ApiInstooErrorResponseOptions extends ApiInstooErrorOptions {
   status?: number;
-  description?: string;
 }
 
 interface ApiInstooResponsesOptions {
@@ -41,14 +41,9 @@ export function ApiInstooResponse<T>(
         type: "object",
         properties: {
           code: {
-            type: "number",
-            example: status,
-            description: "HTTP 상태 코드",
-          },
-          message: {
             type: "string",
-            example: description,
-            description: "응답 메시지",
+            example: null,
+            description: "에러 코드 (성공 시 null)",
             nullable: true,
           },
           content: isArray
@@ -62,7 +57,7 @@ export function ApiInstooResponse<T>(
                 description: "응답 본문",
               },
         },
-        required: ["code", "message", "content"],
+        required: ["code", "content"],
       },
     }),
   );
@@ -72,37 +67,7 @@ export function ApiInstooResponse<T>(
  * InstooApiResponse 배열 응답 전용 데코레이터
  */
 export function ApiInstooArrayResponse<T>(dataType: Type<T>, options: ApiInstooResponseOptions) {
-  const { status = 200, description } = options;
-
-  return applyDecorators(
-    ApiExtraModels(InstooApiResponse, dataType),
-    ApiResponse({
-      status,
-      description,
-      schema: {
-        type: "object",
-        properties: {
-          code: {
-            type: "number",
-            example: status,
-            description: "HTTP 상태 코드",
-          },
-          message: {
-            type: "string",
-            example: description,
-            description: "응답 메시지",
-            nullable: true,
-          },
-          content: {
-            type: "array",
-            items: { $ref: getSchemaPath(dataType) },
-            description: "응답 본문 (배열)",
-          },
-        },
-        required: ["code", "message", "content"],
-      },
-    }),
-  );
+  return ApiInstooResponse(dataType, { ...options, isArray: true });
 }
 
 /**
@@ -122,14 +87,9 @@ export function ApiInstooErrorResponse(
         type: "object",
         properties: {
           code: {
-            type: "number",
-            example: status,
-            description: "HTTP 상태 코드",
-          },
-          message: {
             type: "string",
-            example: errorExample.message,
-            description: "에러 메시지",
+            example: errorExample.code,
+            description: "에러 코드",
           },
           content: {
             type: "null",
@@ -137,7 +97,7 @@ export function ApiInstooErrorResponse(
             description: "응답 본문 (에러 시 null)",
           },
         },
-        required: ["code", "message", "content"],
+        required: ["code", "content"],
       },
     }),
   );
@@ -157,9 +117,9 @@ export function ApiInstooResponses<T>(
   // 에러 응답들 추가
   errors.forEach((error) => {
     decorators.push(
-      ApiInstooErrorResponse(error.status || 400, error.description || error.message, {
+      ApiInstooErrorResponse(error.status || 400, error.description || `에러: ${error.code}`, {
         code: error.code,
-        message: error.message,
+        description: error.description,
       }),
     );
   });
@@ -182,14 +142,9 @@ export function ApiInstooPagedResponse<T>(dataType: Type<T>, options: ApiInstooR
         type: "object",
         properties: {
           code: {
-            type: "number",
-            example: status,
-            description: "HTTP 상태 코드",
-          },
-          message: {
             type: "string",
-            example: description,
-            description: "응답 메시지",
+            example: null,
+            description: "에러 코드 (성공 시 null)",
             nullable: true,
           },
           content: {
@@ -222,7 +177,7 @@ export function ApiInstooPagedResponse<T>(dataType: Type<T>, options: ApiInstooR
             required: ["size", "page", "data"],
           },
         },
-        required: ["code", "message", "content"],
+        required: ["code", "content"],
       },
     }),
   );
@@ -243,14 +198,10 @@ export function ApiInstooSimpleResponse(options: ApiInstooResponseOptions) {
         type: "object",
         properties: {
           code: {
-            type: "number",
-            example: status,
-            description: "HTTP 상태 코드",
-          },
-          message: {
             type: "string",
-            example: description,
-            description: "응답 메시지",
+            example: null,
+            description: "에러 코드 (성공 시 null)",
+            nullable: true,
           },
           content: {
             type: "null",
@@ -258,7 +209,7 @@ export function ApiInstooSimpleResponse(options: ApiInstooResponseOptions) {
             description: "응답 본문 (없음)",
           },
         },
-        required: ["code", "message", "content"],
+        required: ["code", "content"],
       },
     }),
   );
@@ -278,9 +229,9 @@ export function ApiInstooSimpleResponses(options: {
   // 에러 응답들 추가
   errors.forEach((error) => {
     decorators.push(
-      ApiInstooErrorResponse(error.status || 400, error.description || error.message, {
+      ApiInstooErrorResponse(error.status || 400, error.description || `에러: ${error.code}`, {
         code: error.code,
-        message: error.message,
+        description: error.description,
       }),
     );
   });

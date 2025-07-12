@@ -1,13 +1,5 @@
 // src/schedules/services/schedules.service.ts
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  ForbiddenException,
-  InternalServerErrorException,
-  UnauthorizedException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { Streamer } from "@/streamers/entities/streamer.entity";
@@ -25,7 +17,19 @@ import { ScheduleStatus } from "@/common/constants/schedule-status.enum";
 import { Schedule } from "../entities/schedule.entity";
 import { UpdateScheduleDto } from "../dto/update-schedule.dto";
 import { ScheduleHistoryService } from "./schedule-history.service";
-import { HistoryType } from "@/common/constants/history-type.enum";
+import {
+  ApiException,
+  ApiNotFoundException,
+  ApiConflictException,
+  ApiForbiddenException,
+  ApiInternalServerException,
+  ApiUnauthorizedException,
+} from "@/common/exceptions/api-exceptions";
+import {
+  ScheduleErrorCode,
+  StreamerErrorCode,
+  UserErrorCode,
+} from "@/common/constants/api-error.enum";
 
 @Injectable()
 export class SchedulesService {
@@ -54,7 +58,7 @@ export class SchedulesService {
       });
 
       if (!user) {
-        throw new UnauthorizedException("사용자를 찾을 수 없습니다.");
+        throw new ApiUnauthorizedException(ScheduleErrorCode.SCHEDULE_USER_NOT_FOUND);
       }
 
       // 2. 스트리머 존재 확인
@@ -63,15 +67,18 @@ export class SchedulesService {
       });
 
       if (!streamer) {
-        throw new NotFoundException("스트리머를 찾을 수 없습니다.");
+        throw new ApiNotFoundException(ScheduleErrorCode.SCHEDULE_STREAMER_NOT_FOUND);
       }
-      if (!streamer.isVerified) throw new BadRequestException("검증이 완료된 스트리머가 아닙니다.");
+
+      if (!streamer.isVerified) {
+        throw new ApiException(ScheduleErrorCode.SCHEDULE_STREAMER_NOT_VERIFIED);
+      }
 
       // 3. 날짜 유효성 검사 - 오늘 날짜보다 이전인지 확인 (KST 기준)
       const today = TimeUtils.toKstDateString(new Date()); // 오늘 날짜를 KST 기준 문자열로 변환
 
       if (createScheduleDto.scheduleDate < today) {
-        throw new BadRequestException("과거 날짜에는 일정을 생성할 수 없습니다.");
+        throw new ApiException(ScheduleErrorCode.SCHEDULE_PAST_DATE_NOT_ALLOWED);
       }
 
       // 4. 시작 시간 유효성 검사 (SCHEDULED 상태인 경우) - 날짜만 검사
@@ -83,10 +90,11 @@ export class SchedulesService {
 
         // 과거 날짜인지 확인 (날짜 기준)
         if (startTimeDateString < today) {
-          throw new BadRequestException("과거 날짜에는 일정을 생성할 수 없습니다.");
+          throw new ApiException(ScheduleErrorCode.SCHEDULE_PAST_DATE_NOT_ALLOWED);
         }
-        if (createScheduleDto.scheduleDate !== startTimeDateString)
-          throw new BadRequestException("방송일과 방송시간의 일자가 다릅니다.");
+        if (createScheduleDto.scheduleDate !== startTimeDateString) {
+          throw new ApiException(ScheduleErrorCode.SCHEDULE_DATE_TIME_MISMATCH);
+        }
       }
 
       // 5. 같은 날짜에 이미 일정이 있는지 확인 (간단한 문자열 비교)
@@ -98,7 +106,7 @@ export class SchedulesService {
       });
 
       if (existingSchedule) {
-        throw new ConflictException("해당 날짜에 이미 일정이 존재합니다.");
+        throw new ApiConflictException(ScheduleErrorCode.SCHEDULE_ALREADY_EXISTS);
       }
 
       // 6. 시작 시간 처리
@@ -138,7 +146,7 @@ export class SchedulesService {
       });
 
       if (!scheduleWithRelations) {
-        throw new InternalServerErrorException("일정 저장 후 조회에 실패했습니다.");
+        throw new ApiInternalServerException(ScheduleErrorCode.SCHEDULE_SAVE_FAILED);
       }
 
       // 10. DTO로 변환하여 반환
@@ -265,7 +273,7 @@ export class SchedulesService {
     });
 
     if (!schedule) {
-      throw new NotFoundException(`일정을 찾을 수 없습니다. (UUID: ${uuid})`);
+      throw new ApiNotFoundException(ScheduleErrorCode.SCHEDULE_NOT_FOUND);
     }
 
     return ScheduleResponseDto.of(schedule);
@@ -287,7 +295,7 @@ export class SchedulesService {
       });
 
       if (!existingSchedule) {
-        throw new NotFoundException(`일정을 찾을 수 없습니다. (UUID: ${uuid})`);
+        throw new ApiNotFoundException(ScheduleErrorCode.SCHEDULE_NOT_FOUND);
       }
       const previousSchedule = Object.assign(new Schedule(), existingSchedule);
 
@@ -297,7 +305,7 @@ export class SchedulesService {
       });
 
       if (!user) {
-        throw new UnauthorizedException("사용자를 찾을 수 없습니다.");
+        throw new ApiUnauthorizedException(ScheduleErrorCode.SCHEDULE_USER_NOT_FOUND);
       }
 
       // 3. 충돌 방지 - 마지막 수정 시간 확인
@@ -305,9 +313,7 @@ export class SchedulesService {
       const existingUpdatedAt = new Date(existingSchedule.updatedAt);
 
       if (lastUpdatedAt.getTime() !== existingUpdatedAt.getTime()) {
-        throw new ConflictException(
-          "다른 사용자가 이미 수정한 일정입니다. 최신 정보를 다시 확인해주세요.",
-        );
+        throw new ApiConflictException(ScheduleErrorCode.SCHEDULE_CONFLICT_MODIFIED);
       }
 
       // 5. 업데이트할 필드들 준비
@@ -337,9 +343,7 @@ export class SchedulesService {
           // 상태가 SCHEDULED인 경우에만 시작 시간 설정 가능
           const finalStatus = updateScheduleDto.status ?? existingSchedule.status;
           if (finalStatus !== ScheduleStatus.SCHEDULED) {
-            throw new BadRequestException(
-              "확정된 일정(SCHEDULED)에서만 시작 시간을 설정할 수 있습니다.",
-            );
+            throw new ApiException(ScheduleErrorCode.SCHEDULE_TIME_ONLY_FOR_SCHEDULED);
           }
 
           const startTimeDate = new Date(updateScheduleDto.startTime);
@@ -348,10 +352,11 @@ export class SchedulesService {
 
           // 과거 시간 확인
           if (startTimeDateString < today) {
-            throw new BadRequestException("과거 날짜에는 일정을 설정할 수 없습니다.");
+            throw new ApiException(ScheduleErrorCode.SCHEDULE_PAST_DATE_NOT_ALLOWED);
           }
-          if (startTimeDateString !== existingSchedule.scheduleDate)
-            throw new BadRequestException("방송일과 방송시간의 일자가 다릅니다.");
+          if (startTimeDateString !== existingSchedule.scheduleDate) {
+            throw new ApiException(ScheduleErrorCode.SCHEDULE_DATE_TIME_MISMATCH);
+          }
 
           updateData.startTime = startTimeDate;
         } else {
@@ -370,7 +375,7 @@ export class SchedulesService {
 
           // SCHEDULED로 변경하는 경우 시작 시간이 없으면 에러
           if (finalStatus === ScheduleStatus.SCHEDULED && !existingSchedule.startTime) {
-            throw new BadRequestException("확정된 일정(SCHEDULED)에는 시작 시간이 필요합니다.");
+            throw new ApiException(ScheduleErrorCode.SCHEDULE_SCHEDULED_NEEDS_TIME);
           }
         }
       }
@@ -381,7 +386,7 @@ export class SchedulesService {
         updateData.startTime !== undefined ? updateData.startTime : existingSchedule.startTime;
 
       if (finalStatus === ScheduleStatus.SCHEDULED && !finalStartTime) {
-        throw new BadRequestException("확정된 일정(SCHEDULED)에는 시작 시간이 필요합니다.");
+        throw new ApiException(ScheduleErrorCode.SCHEDULE_SCHEDULED_NEEDS_TIME);
       }
 
       if (finalStatus !== ScheduleStatus.SCHEDULED && finalStartTime) {
@@ -399,7 +404,7 @@ export class SchedulesService {
       });
 
       if (!updatedSchedule) {
-        throw new InternalServerErrorException("일정 업데이트 후 조회에 실패했습니다.");
+        throw new ApiInternalServerException(ScheduleErrorCode.SCHEDULE_UPDATE_FAILED);
       }
 
       // 수정 이력 기록
@@ -420,7 +425,7 @@ export class SchedulesService {
   async remove(uuid: string, userUuid: string, userRole: UserRole): Promise<void> {
     // 권한 확인
     if (userRole !== UserRole.ADMIN) {
-      throw new ForbiddenException("관리자만 일정을 삭제할 수 있습니다.");
+      throw new ApiForbiddenException(ScheduleErrorCode.SCHEDULE_DELETE_ADMIN_ONLY);
     }
 
     // 일정 조회
@@ -429,7 +434,7 @@ export class SchedulesService {
     });
 
     if (!schedule) {
-      throw new NotFoundException(`일정을 찾을 수 없습니다. (UUID: ${uuid})`);
+      throw new ApiNotFoundException(ScheduleErrorCode.SCHEDULE_NOT_FOUND);
     }
 
     // Soft delete

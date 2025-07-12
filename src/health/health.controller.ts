@@ -1,16 +1,19 @@
-// src/app.controller.ts (복잡한 데코레이터 버전)
+// src/app.controller.ts (Health Controller)
 import { Controller, Get } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 
-import {
-  ApiInstooErrorResponse,
-  ApiInstooResponse,
-  ApiInstooResponses,
-  ApiInstooSimpleResponse,
-} from "@/common/decorators/api-response.decorator";
+import { ApiInstooResponses } from "@/common/decorators/api-response.decorator";
 import { StringResponseDto } from "./string.response.dto";
 import { InstooApiResponse } from "@/common/dto/instoo-api-response.dto";
 import { HealthService } from "./health.service";
+import { AuthErrorCode } from "@/common/constants/api-error.enum";
+
+// 헬스체크용 에러 코드 (필요시 별도 enum 파일로 분리 가능)
+export enum HealthErrorCode {
+  HEALTH_SERVICE_UNAVAILABLE = "HEALTH_SERVICE_UNAVAILABLE",
+  HEALTH_INTERNAL_SERVER_ERROR = "HEALTH_INTERNAL_SERVER_ERROR",
+  HEALTH_CACHE_RESET_FAILED = "HEALTH_CACHE_RESET_FAILED",
+}
 
 @ApiTags("Health")
 @Controller()
@@ -22,17 +25,22 @@ export class HealthController {
     summary: "Hello World",
     description: "서버 상태 확인용 API",
   })
-  @ApiInstooResponse(StringResponseDto, {
-    status: 200,
-    description: "서버가 정상적으로 동작 중입니다.",
-  })
-  @ApiInstooErrorResponse(500, "서버 내부 오류", {
-    code: "INTERNAL_SERVER_ERROR",
-    message: "서버에서 예기치 않은 오류가 발생했습니다.",
+  @ApiInstooResponses(StringResponseDto, {
+    success: {
+      status: 200,
+      description: "서버가 정상적으로 동작 중입니다.",
+    },
+    errors: [
+      {
+        status: 500,
+        code: AuthErrorCode.AUTH_ACCESS_TOKEN_EXPIRED,
+        description: "서버에서 예기치 않은 오류가 발생했습니다.",
+      },
+    ],
   })
   getHello(): InstooApiResponse<StringResponseDto> {
     const data = new StringResponseDto("Hello World!");
-    return InstooApiResponse.success(data, "서버가 정상적으로 동작 중입니다.");
+    return InstooApiResponse.success(data);
   }
 
   @Get("health")
@@ -48,15 +56,14 @@ export class HealthController {
     errors: [
       {
         status: 503,
-        description: "서비스 이용 불가",
-        code: "SERVICE_UNAVAILABLE",
-        message: "서비스가 일시적으로 이용할 수 없습니다.",
+        code: AuthErrorCode.AUTH_ACCESS_TOKEN_EXPIRED,
+        description: "서비스가 일시적으로 이용할 수 없습니다.",
       },
     ],
   })
   getHealth(): InstooApiResponse<StringResponseDto> {
     const data = new StringResponseDto("서버가 정상적으로 동작 중입니다. v1.0.0");
-    return InstooApiResponse.success(data, "헬스 체크 완료");
+    return InstooApiResponse.success(data);
   }
 
   @Get("ping")
@@ -64,16 +71,22 @@ export class HealthController {
     summary: "핑 테스트",
     description: "서버 응답 시간 확인",
   })
-  @ApiInstooSimpleResponse({
-    status: 200,
-    description: "핑 성공",
+  @ApiInstooResponses(StringResponseDto, {
+    success: {
+      status: 200,
+      description: "핑 성공",
+    },
+    errors: [
+      {
+        status: 503,
+        code: AuthErrorCode.AUTH_ACCESS_TOKEN_EXPIRED,
+        description: "서버가 응답하지 않습니다.",
+      },
+    ],
   })
-  @ApiInstooErrorResponse(503, "서비스 이용 불가", {
-    code: "SERVICE_UNAVAILABLE",
-    message: "서버가 응답하지 않습니다.",
-  })
-  ping(): InstooApiResponse<null> {
-    return InstooApiResponse.success(null, "pong");
+  ping(): InstooApiResponse<StringResponseDto> {
+    const data = new StringResponseDto("pong");
+    return InstooApiResponse.success(data);
   }
 
   @Get("reset")
@@ -81,16 +94,22 @@ export class HealthController {
     summary: "캐시 리셋",
     description: "서버 캐시를 초기화합니다",
   })
-  @ApiInstooSimpleResponse({
-    status: 204,
-    description: "캐시 리셋 완료",
+  @ApiInstooResponses(StringResponseDto, {
+    success: {
+      status: 200,
+      description: "캐시 리셋 완료",
+    },
+    errors: [
+      {
+        status: 500,
+        code: AuthErrorCode.AUTH_ACCESS_TOKEN_EXPIRED,
+        description: "캐시 리셋 중 오류가 발생했습니다.",
+      },
+    ],
   })
-  @ApiInstooErrorResponse(500, "서버 내부 오류", {
-    code: "INTERNAL_SERVER_ERROR",
-    message: "캐시 리셋 중 오류가 발생했습니다.",
-  })
-  reset(): InstooApiResponse<null> {
-    return InstooApiResponse.success(null, "캐시가 성공적으로 리셋되었습니다.");
+  reset(): InstooApiResponse<StringResponseDto> {
+    const data = new StringResponseDto("캐시가 성공적으로 리셋되었습니다.");
+    return InstooApiResponse.success(data);
   }
 
   // 복잡한 예시: 여러 에러 케이스
@@ -106,33 +125,24 @@ export class HealthController {
     },
     errors: [
       {
-        status: 400,
-        description: "잘못된 요청",
-        code: "BAD_REQUEST",
-        message: "요청 파라미터가 올바르지 않습니다.",
-      },
-      {
         status: 401,
-        description: "인증 실패",
-        code: "UNAUTHORIZED",
-        message: "인증이 필요합니다.",
+        code: AuthErrorCode.AUTH_UNAUTHORIZED,
+        description: "인증이 필요합니다.",
       },
       {
         status: 403,
-        description: "권한 없음",
-        code: "FORBIDDEN",
-        message: "해당 리소스에 접근할 권한이 없습니다.",
+        code: AuthErrorCode.AUTH_UNAUTHORIZED,
+        description: "해당 리소스에 접근할 권한이 없습니다.",
       },
       {
         status: 500,
-        description: "서버 내부 오류",
-        code: "INTERNAL_SERVER_ERROR",
-        message: "서버에서 예기치 않은 오류가 발생했습니다.",
+        code: AuthErrorCode.AUTH_ACCESS_TOKEN_EXPIRED,
+        description: "서버에서 예기치 않은 오류가 발생했습니다.",
       },
     ],
   })
   getComplex(): InstooApiResponse<StringResponseDto> {
     const data = new StringResponseDto("복잡한 처리 완료");
-    return InstooApiResponse.success(data, "처리가 완료되었습니다.");
+    return InstooApiResponse.success(data);
   }
 }
