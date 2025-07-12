@@ -219,32 +219,4 @@ export class SchedulesController {
   async remove(@Param("uuid") uuid: string, @Req() req: AuthenticatedRequest): Promise<void> {
     await this.schedulesService.remove(uuid, req.user!.sub, req.user!.role);
   }
-
-  /**
-   *
-   */
-  @Get("uuid/:uuid")
-  @ApiOperation({
-    summary: "❌ 일정 UUID로 조회",
-    description: "UUID로 특정 일정의 상세 정보를 조회합니다.",
-  })
-  @ApiParam({ name: "uuid", description: "일정 UUID" })
-  @ApiInstooResponses(ScheduleResponseDto, {
-    success: {
-      status: 200,
-      description: "일정 조회 성공",
-    },
-    errors: [
-      {
-        status: 404,
-        description: "일정을 찾을 수 없음",
-        code: "SCHEDULE_NOT_FOUND",
-        message: "해당 일정을 찾을 수 없습니다.",
-      },
-    ],
-  })
-  async findByUuid(@Param("uuid") uuid: string): Promise<InstooApiResponse<ScheduleResponseDto>> {
-    const schedule = await this.schedulesService.findByUuid(uuid);
-    return InstooApiResponse.success(schedule, "일정 정보를 성공적으로 조회했습니다.");
-  }
 }
