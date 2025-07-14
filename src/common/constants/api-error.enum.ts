@@ -58,4 +58,24 @@ export enum StreamerErrorCode {
   STREAMER_DELETE_ADMIN_ONLY = "STREAMER_DELETE_ADMIN_ONLY",
 }
 
-export type ApiErrorCode = AuthErrorCode | UserErrorCode | ScheduleErrorCode | StreamerErrorCode;
+// Validation 관련
+export enum ValidationErrorCode {
+  VALIDATION_ERROR = "VALIDATION_ERROR",
+  REQUIRED_FIELD_MISSING = "REQUIRED_FIELD_MISSING",
+  INVALID_EMAIL_FORMAT = "INVALID_EMAIL_FORMAT",
+  INVALID_PASSWORD_FORMAT = "INVALID_PASSWORD_FORMAT",
+  INVALID_INPUT_LENGTH = "INVALID_INPUT_LENGTH",
+  INVALID_DATA_TYPE = "INVALID_DATA_TYPE",
+
+  // 닉네임 관련 validation 에러
+  INVALID_NICKNAME_TYPE = "INVALID_NICKNAME_TYPE",
+  INVALID_NICKNAME_LENGTH = "INVALID_NICKNAME_LENGTH",
+  INVALID_NICKNAME_FORMAT = "INVALID_NICKNAME_FORMAT",
+}
+
+export type ApiErrorCode =
+  | AuthErrorCode
+  | UserErrorCode
+  | ScheduleErrorCode
+  | StreamerErrorCode
+  | ValidationErrorCode;

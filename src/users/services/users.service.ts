@@ -66,15 +66,18 @@ export class UsersService {
    * 사용자 프로필 수정
    */
   async updateProfile(currentUser: AuthInfo, updateData: UpdateProfileDto): Promise<UserInfoDto> {
-    const { userUuid, nickname } = currentUser;
+    const { userUuid } = currentUser;
 
     // 업데이트할 데이터를 수집
     const updateFields: Partial<User> = {
       updatedAt: new Date(),
     };
 
+    const user = await this.findByUuid(userUuid);
+    if (!user) throw new ApiException(UserErrorCode.USER_NOT_FOUND);
+
     if (updateData.nickname !== undefined) {
-      await this.validateNickname(updateData.nickname, nickname, userUuid);
+      await this.validateNickname(updateData.nickname, user.nickname, userUuid);
       updateFields.nickname = updateData.nickname;
     }
 
