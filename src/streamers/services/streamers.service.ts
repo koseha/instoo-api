@@ -11,7 +11,7 @@ import { GetStreamersDto } from "../dto/get-streamers.dto";
 import {
   StreamerResponseDto,
   PagedStreamerResponseDto,
-  StreamerSearchDto,
+  StreamerSimpleDto,
 } from "../dto/streamer-response.dto";
 import { UserRole } from "@/common/constants/user-role.enum";
 import { StreamerHistoryService } from "./streamer-history.service";
@@ -128,7 +128,7 @@ export class StreamersService {
   /**
    * 방송인 목록 조회 - 간편 검색
    */
-  async searchStreamersByName(qName: string): Promise<StreamerSearchDto[]> {
+  async searchStreamersByName(qName: string): Promise<StreamerSimpleDto[]> {
     if (!qName || qName.trim().length < 2) {
       throw new ApiException(StreamerErrorCode.STREAMER_SEARCH_TERM_TOO_SHORT);
     }
@@ -143,7 +143,8 @@ export class StreamersService {
       .limit(5);
 
     const streamers = await queryBuilder.getMany();
-    return streamers.map((m) => StreamerSearchDto.of(m));
+
+    return streamers.map((m) => StreamerSimpleDto.of(m));
   }
 
   /**
@@ -151,8 +152,17 @@ export class StreamersService {
    * - 페이지네이션
    */
   async findAll(body: GetStreamersDto): Promise<PagedStreamerResponseDto> {
-    const { isVerified, platforms, followCount, createdAt, updatedAt, verifiedAt, page, size } =
-      body;
+    const {
+      qName,
+      isVerified,
+      platforms,
+      followCount,
+      createdAt,
+      updatedAt,
+      verifiedAt,
+      page,
+      size,
+    } = body;
 
     // 쿼리 빌더 생성
     const queryBuilder = this.streamerRepository
@@ -170,6 +180,13 @@ export class StreamersService {
     // 플랫폼 필터링
     if (platforms && platforms.length > 0) {
       queryBuilder.andWhere("platform.platformName IN (:...platforms)", { platforms });
+    }
+
+    // 이름 검색 필터링
+    if (qName && qName.trim().length > 0) {
+      queryBuilder.andWhere("streamer.name ILIKE :qName", {
+        qName: `%${qName.trim()}%`,
+      });
     }
 
     // 정렬 조건 적용

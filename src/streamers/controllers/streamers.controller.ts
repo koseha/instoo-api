@@ -22,7 +22,7 @@ import {
   StreamerResponseDto,
   PagedStreamerResponseDto,
   VerifyStreamerDto,
-  StreamerSearchDto,
+  StreamerSimpleDto,
 } from "../dto/streamer-response.dto";
 import { InstooApiResponse } from "@/common/dto/instoo-api-response.dto";
 import {
@@ -111,14 +111,14 @@ export class StreamersController {
     summary: "방송인 간편 검색",
     description: "방송인 이름으로 검색하여 해당하는 방송인들의 목록을 조회합니다.",
   })
-  @ApiInstooArrayResponse(StreamerSearchDto, {
+  @ApiInstooArrayResponse(StreamerSimpleDto, {
     status: 200,
     description: "자동완성 검색 성공",
   })
   @ApiInstooErrorResponse(400, "검색어는 최소 2글자 이상이어야 합니다.", {
     code: StreamerErrorCode.STREAMER_SEARCH_TERM_TOO_SHORT,
   })
-  async search(@Query("qName") qName: string): Promise<InstooApiResponse<StreamerSearchDto[]>> {
+  async search(@Query("qName") qName: string): Promise<InstooApiResponse<StreamerSimpleDto[]>> {
     const result = await this.streamersService.searchStreamersByName(qName);
     return InstooApiResponse.success(result);
   }

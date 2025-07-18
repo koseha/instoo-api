@@ -258,7 +258,7 @@ export class VerifyStreamerDto {
 }
 
 // 간편 검색 응답 DTO
-export class StreamerSearchDto {
+export class StreamerSimpleDto {
   @ApiProperty({
     example: "550e8400-e29b-41d4-a716-446655440000",
     description: "방송인 UUID",
@@ -278,12 +278,29 @@ export class StreamerSearchDto {
   })
   profileImageUrl?: string;
 
+  @ApiProperty({
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        platformName: { type: "string", example: "chzzk" },
+        channelUrl: { type: "string", example: "https://chzzk.tv/example" },
+      },
+    },
+  })
+  platforms: Pick<StreamerPlatformResponseDto, "platformName" | "channelUrl">[];
+
   static of(streamer: Streamer) {
-    const dto = new StreamerSearchDto();
+    const dto = new StreamerSimpleDto();
 
     dto.uuid = streamer.uuid;
     dto.name = streamer.name;
     dto.profileImageUrl = streamer.profileImageUrl;
+
+    dto.platforms = (streamer.platforms || []).map((m) => ({
+      platformName: m.platformName,
+      channelUrl: m.channelUrl,
+    }));
 
     return dto;
   }

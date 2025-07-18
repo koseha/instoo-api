@@ -1,9 +1,27 @@
 // src/streamers/dto/get-streamers.dto.ts
-import { IsOptional, IsBoolean, IsIn, IsArray, IsNumber, Min, Max } from "class-validator";
+import {
+  IsOptional,
+  IsBoolean,
+  IsIn,
+  IsArray,
+  IsNumber,
+  Min,
+  Max,
+  IsString,
+} from "class-validator";
 import { Transform, Type } from "class-transformer";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class GetStreamersDto {
+  @ApiProperty({
+    description: "방송인 검색",
+    required: false,
+    example: "한동",
+  })
+  @IsOptional()
+  @IsString()
+  qName: string;
+
   @ApiProperty({
     description: "인증 상태로 필터링",
     required: true,
