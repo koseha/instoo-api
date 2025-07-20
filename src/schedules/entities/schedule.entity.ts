@@ -37,6 +37,9 @@ export class Schedule extends BaseVersionEntity {
   @Column({ type: "uuid" })
   streamerUuid: string;
 
+  @Column({ default: 0, nullable: true })
+  likeCount?: number;
+
   // Relations
   @ManyToOne(() => Streamer, { nullable: false })
   @JoinColumn({ name: "streamerUuid", referencedColumnName: "uuid" })
@@ -66,6 +69,7 @@ export class Schedule extends BaseVersionEntity {
       updatedAt: this.updatedAt,
       deletedAt: this.deletedAt,
       version: this.version,
+      likeCount: this.likeCount ?? 0,
     };
   }
 }
@@ -85,4 +89,5 @@ export interface SerializedScheduleData {
   updatedAt: Date;
   deletedAt?: Date;
   version: number;
+  likeCount: number;
 }

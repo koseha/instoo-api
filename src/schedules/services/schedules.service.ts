@@ -1,7 +1,7 @@
 // src/schedules/services/schedules.service.ts
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, In, Repository } from "typeorm";
 import { Streamer } from "@/streamers/entities/streamer.entity";
 import { User } from "@/users/entities/user.entity";
 import { CreateScheduleDto } from "../dto/create-schedule.dto";
@@ -30,6 +30,8 @@ import {
   StreamerErrorCode,
   UserErrorCode,
 } from "@/common/constants/api-error.enum";
+import { ScheduleLikesService } from "./schedule-likes.service";
+import { ScheduleLike } from "../entities/schedule-like.entity";
 
 @Injectable()
 export class SchedulesService {
@@ -42,6 +44,8 @@ export class SchedulesService {
     private readonly userRepository: Repository<User>,
     private dataSource: DataSource,
     private readonly scheduleHistoryService: ScheduleHistoryService,
+    @InjectRepository(ScheduleLike)
+    private readonly scheduleLikeRepository: Repository<ScheduleLike>,
   ) {}
 
   /**
@@ -157,7 +161,10 @@ export class SchedulesService {
   /**
    * 일정 목록 조회
    */
-  async findAllByStreamerUuids(body: GetSchedulesDto): Promise<SchedulesResponseDto[]> {
+  async findAllByStreamerUuids(
+    body: GetSchedulesDto,
+    userUuid?: string, // Controller에서 JWT 토큰으로부터 추출해서 전달
+  ): Promise<SchedulesResponseDto[]> {
     const { startDate, endDate, streamerUuids } = body;
 
     // 기본값 설정
@@ -183,6 +190,25 @@ export class SchedulesService {
 
     // 쿼리 실행
     const schedules = await queryBuilder.getMany();
+
+    // 모든 스케줄 UUID 추출
+    const scheduleUuids = schedules.map((schedule) => schedule.uuid);
+
+    // 현재 유저가 좋아요한 스케줄들을 한번에 조회
+    const likedScheduleUuids = new Set<string>();
+    if (userUuid && scheduleUuids.length > 0) {
+      const likedSchedules = await this.scheduleLikeRepository.find({
+        where: {
+          userUuid,
+          scheduleUuid: In(scheduleUuids),
+        },
+        select: ["scheduleUuid"],
+      });
+
+      likedSchedules.forEach((like) => {
+        likedScheduleUuids.add(like.scheduleUuid);
+      });
+    }
 
     // 날짜별로 그룹핑
     const schedulesByDate = new Map<string, Schedule[]>();
@@ -217,7 +243,8 @@ export class SchedulesService {
           startTime: this.formatStartTime(schedule),
           title: schedule.title,
           streamerName: schedule.streamer.name,
-          streamerPlatforms: schedule.streamer.platforms.map((p) => p.platformName) || [],
+          likeCount: schedule.likeCount ?? 0,
+          isLiked: likedScheduleUuids.has(schedule.uuid), // 좋아요 여부 확인
         };
 
         // ScheduleStatus enum 기준으로 분류

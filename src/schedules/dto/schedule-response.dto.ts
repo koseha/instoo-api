@@ -143,6 +143,12 @@ export class ScheduleResponseDto {
   version: number;
 
   @ApiProperty({
+    example: 45,
+    description: "좋아요 수수",
+  })
+  likeCount: number;
+
+  @ApiProperty({
     example: "2025-01-14T10:00:00.000Z",
     description: "생성일시",
   })
@@ -176,6 +182,7 @@ export class ScheduleResponseDto {
       version: schedule.version,
       createdAt: schedule.createdAt.toISOString(),
       updatedAt: schedule.updatedAt.toISOString(),
+      likeCount: schedule.likeCount ?? 0,
     };
   }
 }
@@ -268,12 +275,16 @@ export class ScheduleBaseInfoDto {
   streamerName: string;
 
   @ApiProperty({
-    example: ["chzzk", "soop", "youtube"],
-    description: "스트리머가 활동하는 플랫폼 목록",
-    isArray: true,
-    type: String,
+    example: 37,
+    description: "좋아요 수",
   })
-  streamerPlatforms: string[];
+  likeCount: number;
+
+  @ApiProperty({
+    example: true,
+    description: "좋아요 여부",
+  })
+  isLiked: boolean;
 }
 
 // 일정 목록 응답 DTO

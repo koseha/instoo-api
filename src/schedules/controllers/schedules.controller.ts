@@ -29,6 +29,7 @@ import { RolesGuard } from "@/auth/guard/role.guard";
 import { Roles } from "@/auth/decorators/roles.decorator";
 import { UserRole } from "@/common/constants/user-role.enum";
 import { ScheduleErrorCode, AuthErrorCode } from "@/common/constants/api-error.enum";
+import { OptionalJwtAuthGuard } from "@/auth/guard/optional-jwt-auth.guard";
 
 @ApiTags("Schedules")
 @Controller()
@@ -92,7 +93,7 @@ export class SchedulesController {
     @Body() createScheduleDto: CreateScheduleDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<InstooApiResponse<ScheduleResponseDto>> {
-    const schedule = await this.schedulesService.create(createScheduleDto, req.user!.sub);
+    const schedule = await this.schedulesService.create(createScheduleDto, req.user!.userUuid);
     return InstooApiResponse.success(schedule);
   }
 
@@ -108,10 +109,14 @@ export class SchedulesController {
     status: 200,
     description: "일정 목록 조회 성공",
   })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth()
   async findAllByStreamerUuids(
     @Body() body: GetSchedulesDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<InstooApiResponse<SchedulesResponseDto[]>> {
-    const result = await this.schedulesService.findAllByStreamerUuids(body);
+    const userUuid = req.user?.userUuid;
+    const result = await this.schedulesService.findAllByStreamerUuids(body, userUuid);
     return InstooApiResponse.success(result);
   }
 

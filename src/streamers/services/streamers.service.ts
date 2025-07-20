@@ -22,6 +22,7 @@ import {
   ApiForbiddenException,
 } from "@/common/exceptions/api-exceptions";
 import { StreamerErrorCode, UserErrorCode } from "@/common/constants/api-error.enum";
+import { TimeUtils } from "@/common/utils/time.utils";
 
 @Injectable()
 export class StreamersService {
@@ -137,6 +138,7 @@ export class StreamersService {
       .createQueryBuilder("streamer")
       .leftJoinAndSelect("streamer.platforms", "platform")
       .where("streamer.isActive = :isActive", { isActive: true })
+      .andWhere("streamer.isVerified = :isVerified", { isVerified: true })
       .andWhere("streamer.name ILIKE :name", {
         name: `%${qName.trim()}%`,
       })
@@ -387,6 +389,14 @@ export class StreamersService {
     }
 
     streamer.isVerified = isVerified;
+    // 인증 상태에 따라 verifiedAt 설정
+    if (isVerified) {
+      // 인증 시: 현재 시간을 UTC로 저장
+      streamer.verifiedAt = new Date();
+    } else {
+      // 인증 해제 시: null로 설정
+      streamer.verifiedAt = null;
+    }
     await this.streamerRepository.save(streamer);
 
     return this.findByUuid(uuid);

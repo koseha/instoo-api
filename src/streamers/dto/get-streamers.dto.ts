@@ -9,7 +9,7 @@ import {
   Max,
   IsString,
 } from "class-validator";
-import { Transform, Type } from "class-transformer";
+import { Type } from "class-transformer";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class GetStreamersDto {
@@ -20,7 +20,7 @@ export class GetStreamersDto {
   })
   @IsOptional()
   @IsString()
-  qName: string;
+  qName?: string;
 
   @ApiProperty({
     description: "인증 상태로 필터링",
@@ -28,7 +28,6 @@ export class GetStreamersDto {
     example: true,
   })
   @IsOptional()
-  @Transform(({ value }) => value === "true")
   @IsBoolean()
   isVerified: boolean;
 

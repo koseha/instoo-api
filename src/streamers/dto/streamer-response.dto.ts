@@ -93,6 +93,12 @@ export class StreamerResponseDto {
   description?: string;
 
   @ApiProperty({
+    example: 3,
+    description: "팔로우 수",
+  })
+  followCount: number;
+
+  @ApiProperty({
     example: false,
     description: "인증 여부",
   })
@@ -137,12 +143,19 @@ export class StreamerResponseDto {
   })
   updatedAt: Date;
 
+  @ApiProperty({
+    example: "2025-07-03T10:00:00.000Z",
+    description: "인증일시시",
+  })
+  verifiedAt: Date | null;
+
   static of(streamer: Streamer): StreamerResponseDto {
     return {
       uuid: streamer.uuid,
       name: streamer.name,
       profileImageUrl: streamer.profileImageUrl,
       description: streamer.description,
+      followCount: streamer.followCount,
       isVerified: streamer.isVerified,
       isActive: streamer.isActive,
       platforms:
@@ -160,6 +173,7 @@ export class StreamerResponseDto {
       updatedBy: UserSummaryDto.of(streamer.updatedByUser),
       createdAt: streamer.createdAt,
       updatedAt: streamer.updatedAt,
+      verifiedAt: streamer.verifiedAt,
     };
   }
 }
@@ -290,6 +304,12 @@ export class StreamerSimpleDto {
   })
   platforms: Pick<StreamerPlatformResponseDto, "platformName" | "channelUrl">[];
 
+  @ApiProperty({
+    example: 13,
+    description: "팔로우 수수",
+  })
+  followCount: number;
+
   static of(streamer: Streamer) {
     const dto = new StreamerSimpleDto();
 
@@ -301,6 +321,7 @@ export class StreamerSimpleDto {
       platformName: m.platformName,
       channelUrl: m.channelUrl,
     }));
+    dto.followCount = streamer.followCount;
 
     return dto;
   }

@@ -31,6 +31,9 @@ export class Streamer extends BaseVersionEntity {
   @Column({ type: "int", default: 0 })
   followCount: number;
 
+  @Column({ type: "timestamptz", nullable: true })
+  verifiedAt: Date | null;
+
   // Relations
   @OneToMany(() => StreamerPlatform, (platform) => platform.streamer, {
     cascade: true,
