@@ -293,7 +293,7 @@ export class SchedulesService {
   /**
    * UUID로 일정 상세 조회
    */
-  async findByUuid(uuid: string): Promise<ScheduleResponseDto> {
+  async findByUuid(uuid: string, userUuid?: string): Promise<ScheduleResponseDto> {
     const schedule = await this.scheduleRepository.findOne({
       where: { uuid },
       relations: ["streamer", "createdByUser", "updatedByUser"],
@@ -303,7 +303,20 @@ export class SchedulesService {
       throw new ApiNotFoundException(ScheduleErrorCode.SCHEDULE_NOT_FOUND);
     }
 
-    return ScheduleResponseDto.of(schedule);
+    let isLiked = false;
+
+    if (userUuid) {
+      const likedEntity = await this.scheduleLikeRepository.findOne({
+        where: {
+          schedule: { uuid },
+          user: { uuid: userUuid },
+        },
+      });
+
+      isLiked = !!likedEntity;
+    }
+
+    return ScheduleResponseDto.of(schedule, isLiked);
   }
 
   /**

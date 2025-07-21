@@ -84,8 +84,8 @@ export class ScheduleResponseDto {
   scheduleDate: string;
 
   @ApiProperty({
-    example: "18:00:00",
-    description: "시작 시간 (HH:mm:ss 형식, KST 기준)",
+    example: "18:00",
+    description: "시작 시간 (HH:mm 형식, KST 기준)",
     nullable: true,
   })
   startTime?: string;
@@ -96,18 +96,6 @@ export class ScheduleResponseDto {
     enum: ScheduleStatus,
   })
   status: ScheduleStatus;
-
-  @ApiProperty({
-    example: false,
-    description: "시간 미정 여부 (하위 호환성)",
-  })
-  isTimeUndecided: boolean;
-
-  @ApiProperty({
-    example: false,
-    description: "휴방 여부 (하위 호환성)",
-  })
-  isBreak: boolean;
 
   @ApiProperty({
     example: "롤 랭크게임 예정",
@@ -144,9 +132,15 @@ export class ScheduleResponseDto {
 
   @ApiProperty({
     example: 45,
-    description: "좋아요 수수",
+    description: "좋아요 수",
   })
   likeCount: number;
+
+  @ApiProperty({
+    example: false,
+    description: "좋아요 여부",
+  })
+  isLiked: boolean;
 
   @ApiProperty({
     example: "2025-01-14T10:00:00.000Z",
@@ -160,7 +154,7 @@ export class ScheduleResponseDto {
   })
   updatedAt: string;
 
-  static of(schedule: Schedule): ScheduleResponseDto {
+  static of(schedule: Schedule, isLiked: boolean = false): ScheduleResponseDto {
     return {
       uuid: schedule.uuid,
       title: schedule.title,
@@ -173,8 +167,6 @@ export class ScheduleResponseDto {
       // 새로운 status 필드
       status: schedule.status,
       // 하위 호환성을 위한 computed 필드들
-      isTimeUndecided: schedule.status === ScheduleStatus.TIME_TBD,
-      isBreak: schedule.status === ScheduleStatus.BREAK,
       description: schedule.description,
       streamer: StreamerSummaryDto.of(schedule.streamer),
       createdBy: UserSummaryDto.of(schedule.createdByUser),
@@ -183,6 +175,7 @@ export class ScheduleResponseDto {
       createdAt: schedule.createdAt.toISOString(),
       updatedAt: schedule.updatedAt.toISOString(),
       likeCount: schedule.likeCount ?? 0,
+      isLiked: isLiked,
     };
   }
 }

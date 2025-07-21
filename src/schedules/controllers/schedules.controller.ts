@@ -142,8 +142,14 @@ export class SchedulesController {
       },
     ],
   })
-  async findOne(@Param("uuid") uuid: string): Promise<InstooApiResponse<ScheduleResponseDto>> {
-    const schedule = await this.schedulesService.findByUuid(uuid);
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth()
+  async findOne(
+    @Param("uuid") uuid: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<InstooApiResponse<ScheduleResponseDto>> {
+    const userUuid = req.user?.userUuid;
+    const schedule = await this.schedulesService.findByUuid(uuid, userUuid);
     return InstooApiResponse.success(schedule);
   }
 
