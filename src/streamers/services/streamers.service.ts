@@ -1,7 +1,7 @@
 // src/streamers/services/streamers.service.ts
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, EntityManager, Repository } from "typeorm";
+import { DataSource, EntityManager, In, Repository } from "typeorm";
 import { Streamer } from "../entities/streamer.entity";
 import { StreamerPlatform } from "../entities/streamer-platform.entity";
 import { User } from "@/users/entities/user.entity";
@@ -23,6 +23,7 @@ import {
 } from "@/common/exceptions/api-exceptions";
 import { StreamerErrorCode, UserErrorCode } from "@/common/constants/api-error.enum";
 import { TimeUtils } from "@/common/utils/time.utils";
+import { StreamerFollow } from "../entities/streamer-follow.entity";
 
 @Injectable()
 export class StreamersService {
@@ -31,6 +32,8 @@ export class StreamersService {
     private readonly streamerRepository: Repository<Streamer>,
     @InjectRepository(StreamerPlatform)
     private readonly streamerPlatformRepository: Repository<StreamerPlatform>,
+    @InjectRepository(StreamerFollow)
+    private readonly streamerFollowRepository: Repository<StreamerFollow>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private dataSource: DataSource,
@@ -150,6 +153,46 @@ export class StreamersService {
   }
 
   /**
+   * uuid로 방송인 간단 조회
+   */
+  async getSimpleByUuid(uuid: string): Promise<StreamerSimpleDto> {
+    const streamer = await this.streamerRepository.findOne({
+      where: {
+        uuid,
+        isActive: true,
+        isVerified: true,
+      },
+      relations: ["platforms"],
+    });
+
+    if (!streamer) {
+      throw new NotFoundException(`Streamer with uuid ${uuid} not found`);
+    }
+
+    return StreamerSimpleDto.of(streamer);
+  }
+
+  /**
+   * 여러 uuid로 방송인 배치 조회 (선택사항)
+   */
+  async getSimpleByUuids(uuids: string[]): Promise<StreamerSimpleDto[]> {
+    if (uuids.length === 0) {
+      return [];
+    }
+
+    const streamers = await this.streamerRepository.find({
+      where: {
+        uuid: In(uuids),
+        isActive: true,
+        isVerified: true,
+      },
+      relations: ["platforms"],
+    });
+
+    return streamers.map((streamer) => StreamerSimpleDto.of(streamer));
+  }
+
+  /**
    * 방송인 목록 조회
    * - 페이지네이션
    */
@@ -244,7 +287,7 @@ export class StreamersService {
   /**
    * UUID로 방송인 조회
    */
-  async findByUuid(uuid: string): Promise<StreamerResponseDto> {
+  async findByUuid(uuid: string, userUuid?: string): Promise<StreamerResponseDto> {
     const streamer = await this.streamerRepository.findOne({
       where: { uuid, isActive: true },
       relations: ["platforms", "createdByUser", "updatedByUser"],
@@ -254,7 +297,20 @@ export class StreamersService {
       throw new ApiNotFoundException(StreamerErrorCode.STREAMER_NOT_FOUND);
     }
 
-    return this.toResponseDto(streamer);
+    let isFollowed = false;
+
+    if (userUuid) {
+      const followedEntity = await this.streamerFollowRepository.findOne({
+        where: {
+          streamerUuid: uuid,
+          userUuid: userUuid,
+        },
+      });
+
+      isFollowed = !!followedEntity;
+    }
+
+    return this.toResponseDto(streamer, isFollowed);
   }
 
   /**
@@ -422,7 +478,7 @@ export class StreamersService {
   /**
    * Entity를 ResponseDto로 변환
    */
-  private toResponseDto(streamer: Streamer): StreamerResponseDto {
-    return StreamerResponseDto.of(streamer);
+  private toResponseDto(streamer: Streamer, isFollowed: boolean = false): StreamerResponseDto {
+    return StreamerResponseDto.of(streamer, isFollowed);
   }
 }

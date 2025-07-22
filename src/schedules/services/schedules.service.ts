@@ -296,7 +296,7 @@ export class SchedulesService {
   async findByUuid(uuid: string, userUuid?: string): Promise<ScheduleResponseDto> {
     const schedule = await this.scheduleRepository.findOne({
       where: { uuid },
-      relations: ["streamer", "createdByUser", "updatedByUser"],
+      relations: ["streamer", "streamer.platforms", "createdByUser", "updatedByUser"],
     });
 
     if (!schedule) {
@@ -433,6 +433,9 @@ export class SchedulesService {
         // 이미 위에서 처리했지만 안전을 위해 다시 한 번 확인
         updateData.startTime = null;
       }
+
+      // 7-1. 버전 증가
+      updateData.version = existingSchedule.version + 1;
 
       // 8. 업데이트 실행
       await manager.update(Schedule, { uuid }, updateData);

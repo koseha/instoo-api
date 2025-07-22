@@ -7,6 +7,8 @@ import { Schedule } from "@/schedules/entities/schedule.entity";
 import { ScheduleHistory } from "@/schedules/entities/schedule-history.entity";
 import { StreamerHistory } from "@/streamers/entities/streamer-history.entity";
 import { ScheduleLike } from "@/schedules/entities/schedule-like.entity";
+import { StreamerFollow } from "@/streamers/entities/streamer-follow.entity";
+import { StreamerFollowHistory } from "@/streamers/entities/streamer-follow-history.entity";
 
 export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOptions => {
   const isProduction = configService.get<string>("NODE_ENV") === "production";
@@ -27,6 +29,8 @@ export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOp
       ScheduleHistory,
       StreamerHistory,
       ScheduleLike,
+      StreamerFollow,
+      StreamerFollowHistory,
     ],
 
     // migrations: [__dirname + "/../migrations/*{.ts,.js}"],

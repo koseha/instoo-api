@@ -37,6 +37,8 @@ import { RolesGuard } from "@/auth/guard/role.guard";
 import { Roles } from "@/auth/decorators/roles.decorator";
 import { UserRole } from "@/common/constants/user-role.enum";
 import { StreamerErrorCode, AuthErrorCode, UserErrorCode } from "@/common/constants/api-error.enum";
+import { OptionalJwtAuthGuard } from "@/auth/guard/optional-jwt-auth.guard";
+import { StreamerBatchRequestDto } from "../dto/streamer-batch.dto";
 
 @ApiTags("Streamers")
 @Controller()
@@ -113,7 +115,7 @@ export class StreamersController {
   })
   @ApiInstooArrayResponse(StreamerSimpleDto, {
     status: 200,
-    description: "자동완성 검색 성공",
+    description: "간편 검색 성공",
   })
   @ApiInstooErrorResponse(400, "검색어는 최소 2글자 이상이어야 합니다.", {
     code: StreamerErrorCode.STREAMER_SEARCH_TERM_TOO_SHORT,
@@ -145,9 +147,62 @@ export class StreamersController {
       },
     ],
   })
-  async findOne(@Param("uuid") uuid: string): Promise<InstooApiResponse<StreamerResponseDto>> {
-    const streamer = await this.streamersService.findByUuid(uuid);
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth()
+  async findOne(
+    @Param("uuid") uuid: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<InstooApiResponse<StreamerResponseDto>> {
+    const userUuid = req.user?.userUuid;
+    const streamer = await this.streamersService.findByUuid(uuid, userUuid);
     return InstooApiResponse.success(streamer);
+  }
+
+  /**
+   * 방송인 uuid로 간편 조회
+   */
+  @Get("v1/streamers/simple")
+  @ApiOperation({
+    summary: "방송인 uuid로 간편 검색",
+    description: "방송인 uuid에 해당하는 방송인의 정보를 간단하게 조회합니다.",
+  })
+  @ApiInstooResponses(StreamerSimpleDto, {
+    success: {
+      status: 200,
+      description: "방송인 조회 성공",
+    },
+    errors: [
+      {
+        status: 404,
+        code: StreamerErrorCode.STREAMER_NOT_FOUND,
+        description: "방송인을 찾을 수 없습니다.",
+      },
+    ],
+  })
+  async getSimpleByUuid(
+    @Param("uuid") streamerUuid: string,
+  ): Promise<InstooApiResponse<StreamerSimpleDto>> {
+    const result = await this.streamersService.getSimpleByUuid(streamerUuid);
+    return InstooApiResponse.success(result);
+  }
+
+  /**
+   * 방송인 배치 조회
+   */
+  @Post("v1/streamers/batch-simple")
+  @ApiOperation({
+    summary: "방송인 배치 조회",
+    description: "여러 방송인의 UUID를 한 번에 조회하여 정보를 가져옵니다.",
+  })
+  @ApiInstooArrayResponse(StreamerSimpleDto, {
+    status: 200,
+    description: "방송인 배치 조회 성공",
+  })
+  async getBatchByUuids(
+    @Body() requestDto: StreamerBatchRequestDto,
+  ): Promise<InstooApiResponse<StreamerSimpleDto[]>> {
+    const result = await this.streamersService.getSimpleByUuids(requestDto.uuids);
+    return InstooApiResponse.success(result);
   }
 
   /**

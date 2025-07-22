@@ -100,6 +100,12 @@ export class StreamerResponseDto {
 
   @ApiProperty({
     example: false,
+    description: "팔로우 여부",
+  })
+  isFollowed: boolean;
+
+  @ApiProperty({
+    example: false,
     description: "인증 여부",
   })
   isVerified: boolean;
@@ -149,7 +155,7 @@ export class StreamerResponseDto {
   })
   verifiedAt: Date | null;
 
-  static of(streamer: Streamer): StreamerResponseDto {
+  static of(streamer: Streamer, isFollowed: boolean = false): StreamerResponseDto {
     return {
       uuid: streamer.uuid,
       name: streamer.name,
@@ -174,6 +180,7 @@ export class StreamerResponseDto {
       createdAt: streamer.createdAt,
       updatedAt: streamer.updatedAt,
       verifiedAt: streamer.verifiedAt,
+      isFollowed: isFollowed,
     };
   }
 }

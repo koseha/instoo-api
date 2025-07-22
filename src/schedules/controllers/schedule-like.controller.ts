@@ -25,7 +25,7 @@ export class ScheduleLikesController {
     return InstooApiResponse.success("like");
   }
 
-  @Delete("v1/schedules/:uuid/like")
+  @Delete("v1/schedules/:uuid/unlike")
   @ApiOperation({
     summary: "일정 좋아요 취소",
     description: "일정 좋아요 취소",

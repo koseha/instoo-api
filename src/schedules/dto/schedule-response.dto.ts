@@ -5,6 +5,7 @@ import { ApiProperty } from "@nestjs/swagger";
 import { Schedule } from "../entities/schedule.entity";
 import { ScheduleStatus } from "@/common/constants/schedule-status.enum";
 import { TimeUtils } from "@/common/utils/time.utils";
+import { StreamerPlatformResponseDto } from "@/streamers/dto/streamer-response.dto";
 
 export class UserSummaryDto {
   @ApiProperty({
@@ -54,12 +55,28 @@ export class StreamerSummaryDto {
   })
   isVerified: boolean;
 
+  @ApiProperty({
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        platformName: { type: "string", example: "chzzk" },
+        channelUrl: { type: "string", example: "https://chzzk.tv/example" },
+      },
+    },
+  })
+  platforms: Pick<StreamerPlatformResponseDto, "platformName" | "channelUrl">[];
+
   static of(streamer: Streamer): StreamerSummaryDto {
     return {
       uuid: streamer.uuid,
       name: streamer.name,
       profileImageUrl: streamer.profileImageUrl,
       isVerified: streamer.isVerified,
+      platforms: (streamer.platforms || []).map((m) => ({
+        platformName: m.platformName,
+        channelUrl: m.channelUrl,
+      })),
     };
   }
 }
