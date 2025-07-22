@@ -122,6 +122,13 @@ export class ScheduleResponseDto {
   description?: string;
 
   @ApiProperty({
+    example: "url ~~",
+    description: "참고 링크",
+    nullable: true,
+  })
+  externalNoticeUrl?: string;
+
+  @ApiProperty({
     type: StreamerSummaryDto,
     description: "방송인 정보",
   })
@@ -185,6 +192,7 @@ export class ScheduleResponseDto {
       status: schedule.status,
       // 하위 호환성을 위한 computed 필드들
       description: schedule.description,
+      externalNoticeUrl: schedule.externalNoticeUrl,
       streamer: StreamerSummaryDto.of(schedule.streamer),
       createdBy: UserSummaryDto.of(schedule.createdByUser),
       updatedBy: UserSummaryDto.of(schedule.updatedByUser),

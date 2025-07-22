@@ -132,12 +132,13 @@ export class StreamersService {
   /**
    * 방송인 목록 조회 - 간편 검색
    */
-  async searchStreamersByName(qName: string): Promise<StreamerSimpleDto[]> {
+  async searchStreamersByName(qName: string, userUuid?: string): Promise<StreamerSimpleDto[]> {
     if (!qName || qName.trim().length < 2) {
       throw new ApiException(StreamerErrorCode.STREAMER_SEARCH_TERM_TOO_SHORT);
     }
 
-    const queryBuilder = this.streamerRepository
+    // 스트리머 검색
+    const streamers = await this.streamerRepository
       .createQueryBuilder("streamer")
       .leftJoinAndSelect("streamer.platforms", "platform")
       .where("streamer.isActive = :isActive", { isActive: true })
@@ -145,17 +146,36 @@ export class StreamersService {
       .andWhere("streamer.name ILIKE :name", {
         name: `%${qName.trim()}%`,
       })
-      .limit(5);
+      .limit(5)
+      .getMany();
 
-    const streamers = await queryBuilder.getMany();
+    // 팔로우 정보 한 번에 가져오기
+    let followedStreamerUuids: Set<string> = new Set();
 
-    return streamers.map((m) => StreamerSimpleDto.of(m));
+    if (userUuid && streamers.length > 0) {
+      const streamerUuids = streamers.map((s) => s.uuid);
+
+      const follows = await this.streamerFollowRepository.find({
+        where: {
+          userUuid,
+          streamerUuid: In(streamerUuids),
+        },
+        select: ["streamerUuid"],
+      });
+
+      followedStreamerUuids = new Set(follows.map((f) => f.streamerUuid));
+    }
+
+    // DTO 생성
+    return streamers.map((streamer) =>
+      StreamerSimpleDto.of(streamer, followedStreamerUuids.has(streamer.uuid)),
+    );
   }
 
   /**
    * uuid로 방송인 간단 조회
    */
-  async getSimpleByUuid(uuid: string): Promise<StreamerSimpleDto> {
+  async getSimpleByUuid(uuid: string, userUuid?: string): Promise<StreamerSimpleDto> {
     const streamer = await this.streamerRepository.findOne({
       where: {
         uuid,
@@ -169,17 +189,31 @@ export class StreamersService {
       throw new NotFoundException(`Streamer with uuid ${uuid} not found`);
     }
 
-    return StreamerSimpleDto.of(streamer);
+    let isFollowed = false;
+
+    if (userUuid) {
+      const followedEntity = await this.streamerFollowRepository.findOne({
+        where: {
+          streamerUuid: streamer.uuid,
+          userUuid: userUuid,
+        },
+      });
+
+      isFollowed = !!followedEntity;
+    }
+
+    return StreamerSimpleDto.of(streamer, isFollowed);
   }
 
   /**
    * 여러 uuid로 방송인 배치 조회 (선택사항)
    */
-  async getSimpleByUuids(uuids: string[]): Promise<StreamerSimpleDto[]> {
+  async getSimpleByUuids(uuids: string[], userUuid?: string): Promise<StreamerSimpleDto[]> {
     if (uuids.length === 0) {
       return [];
     }
 
+    // 스트리머 정보 가져오기
     const streamers = await this.streamerRepository.find({
       where: {
         uuid: In(uuids),
@@ -189,7 +223,27 @@ export class StreamersService {
       relations: ["platforms"],
     });
 
-    return streamers.map((streamer) => StreamerSimpleDto.of(streamer));
+    // 팔로우 정보 한 번에 가져오기
+    let followedStreamerUuids: Set<string> = new Set();
+
+    if (userUuid && streamers.length > 0) {
+      const streamerUuids = streamers.map((s) => s.uuid);
+
+      const follows = await this.streamerFollowRepository.find({
+        where: {
+          userUuid,
+          streamerUuid: In(streamerUuids),
+        },
+        select: ["streamerUuid"],
+      });
+
+      followedStreamerUuids = new Set(follows.map((f) => f.streamerUuid));
+    }
+
+    // DTO 생성
+    return streamers.map((streamer) =>
+      StreamerSimpleDto.of(streamer, followedStreamerUuids.has(streamer.uuid)),
+    );
   }
 
   /**

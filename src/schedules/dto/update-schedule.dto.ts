@@ -58,6 +58,18 @@ export class UpdateScheduleDto {
   description?: string;
 
   @ApiProperty({
+    example: "url~~",
+    description: "참고 링크",
+    required: false,
+    maxLength: 300,
+  })
+  @IsOptional()
+  @Trim()
+  @IsString()
+  @MaxLength(300, { message: "참고 링크는 최대 300글자까지 가능합니다." })
+  externalNoticeUrl?: string;
+
+  @ApiProperty({
     example: "2025-01-14T15:30:00.000Z",
     description: "마지막 수정 시간 (충돌 방지용)",
     required: true,

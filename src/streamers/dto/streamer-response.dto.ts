@@ -313,11 +313,17 @@ export class StreamerSimpleDto {
 
   @ApiProperty({
     example: 13,
-    description: "팔로우 수수",
+    description: "팔로우 수",
   })
   followCount: number;
 
-  static of(streamer: Streamer) {
+  @ApiProperty({
+    example: true,
+    description: "팔로우 여부",
+  })
+  isFollowed: boolean;
+
+  static of(streamer: Streamer, isFollowed: boolean = false) {
     const dto = new StreamerSimpleDto();
 
     dto.uuid = streamer.uuid;
@@ -329,6 +335,7 @@ export class StreamerSimpleDto {
       channelUrl: m.channelUrl,
     }));
     dto.followCount = streamer.followCount;
+    dto.isFollowed = isFollowed;
 
     return dto;
   }

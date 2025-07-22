@@ -120,8 +120,14 @@ export class StreamersController {
   @ApiInstooErrorResponse(400, "검색어는 최소 2글자 이상이어야 합니다.", {
     code: StreamerErrorCode.STREAMER_SEARCH_TERM_TOO_SHORT,
   })
-  async search(@Query("qName") qName: string): Promise<InstooApiResponse<StreamerSimpleDto[]>> {
-    const result = await this.streamersService.searchStreamersByName(qName);
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth()
+  async search(
+    @Query("qName") qName: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<InstooApiResponse<StreamerSimpleDto[]>> {
+    const userUuid = req.user?.userUuid;
+    const result = await this.streamersService.searchStreamersByName(qName, userUuid);
     return InstooApiResponse.success(result);
   }
 
@@ -179,10 +185,14 @@ export class StreamersController {
       },
     ],
   })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth()
   async getSimpleByUuid(
     @Param("uuid") streamerUuid: string,
+    @Req() req: AuthenticatedRequest,
   ): Promise<InstooApiResponse<StreamerSimpleDto>> {
-    const result = await this.streamersService.getSimpleByUuid(streamerUuid);
+    const userUuid = req.user?.userUuid;
+    const result = await this.streamersService.getSimpleByUuid(streamerUuid, userUuid);
     return InstooApiResponse.success(result);
   }
 
@@ -198,10 +208,14 @@ export class StreamersController {
     status: 200,
     description: "방송인 배치 조회 성공",
   })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth()
   async getBatchByUuids(
     @Body() requestDto: StreamerBatchRequestDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<InstooApiResponse<StreamerSimpleDto[]>> {
-    const result = await this.streamersService.getSimpleByUuids(requestDto.uuids);
+    const userUuid = req.user?.userUuid;
+    const result = await this.streamersService.getSimpleByUuids(requestDto.uuids, userUuid);
     return InstooApiResponse.success(result);
   }
 

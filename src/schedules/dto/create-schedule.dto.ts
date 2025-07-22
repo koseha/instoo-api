@@ -65,6 +65,18 @@ export class CreateScheduleDto {
   description?: string;
 
   @ApiProperty({
+    example: "url~~",
+    description: "참고 링크",
+    required: false,
+    maxLength: 300,
+  })
+  @IsOptional()
+  @Trim()
+  @IsString()
+  @MaxLength(300, { message: "참고 링크는 최대 300글자까지 가능합니다." })
+  externalNoticeUrl?: string;
+
+  @ApiProperty({
     example: "550e8400-e29b-41d4-a716-446655440000",
     description: "방송인 UUID",
   })

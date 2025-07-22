@@ -128,6 +128,7 @@ export class SchedulesService {
         startTime: startTime, // UTC Date 객체로 저장
         status: createScheduleDto.status, // enum 값 직접 저장
         description: createScheduleDto.description,
+        externalNoticeUrl: createScheduleDto.externalNoticeUrl,
         streamerUuid: createScheduleDto.streamerUuid,
         createdBy: userUuid, // BaseVersionEntity의 createdBy 필드
         updatedBy: userUuid, // BaseVersionEntity의 updatedBy 필드

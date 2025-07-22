@@ -34,6 +34,9 @@ export class Schedule extends BaseVersionEntity {
   @Column({ type: "text", nullable: true })
   description?: string;
 
+  @Column({ nullable: true })
+  externalNoticeUrl: string;
+
   @Column({ type: "uuid" })
   streamerUuid: string;
 
@@ -62,6 +65,7 @@ export class Schedule extends BaseVersionEntity {
       startTime: this.startTime,
       status: this.status,
       description: this.description,
+      externalNoticeUrl: this.externalNoticeUrl,
       streamerUuid: this.streamerUuid,
       createdBy: this.createdBy || "",
       updatedBy: this.updatedBy || "",
@@ -82,6 +86,7 @@ export interface SerializedScheduleData {
   startTime?: Date | null;
   status: ScheduleStatus;
   description?: string;
+  externalNoticeUrl?: string;
   streamerUuid: string;
   createdBy: string;
   updatedBy: string;
