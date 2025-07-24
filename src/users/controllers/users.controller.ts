@@ -1,7 +1,7 @@
 import { AuthenticatedRequest, JwtAuthGuard } from "@/auth/guard/jwt-auth.guard";
 import { ApiInstooResponses } from "@/common/decorators/api-response.decorator";
 import { InstooApiResponse } from "@/common/dto/instoo-api-response.dto";
-import { Body, Controller, Get, Param, Patch, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Put, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { UserInfoDto } from "../dto/user-response.dto";
 import { UsersService } from "../services/users.service";

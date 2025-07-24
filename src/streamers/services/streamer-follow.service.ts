@@ -5,6 +5,7 @@ import { Repository } from "typeorm";
 import { StreamerFollow } from "../entities/streamer-follow.entity";
 import { StreamerFollowHistory, FollowAction } from "../entities/streamer-follow-history.entity";
 import { Streamer } from "../entities/streamer.entity";
+import { MyStreamerDto } from "@/users/dto/user-response.dto";
 
 @Injectable()
 export class StreamerFollowService {
@@ -138,5 +139,63 @@ export class StreamerFollowService {
       order: { createdAt: "DESC" },
       take: limit,
     });
+  }
+
+  /**
+   * 팔로우 상태 배치 업데이트 (on/off 상태)
+   * @param userUuid 사용자 UUID
+   * @param updates 업데이트할 상태 목록
+   */
+  async batchUpdateFollowStatus(
+    userUuid: string,
+    updates: { streamerUuid: string; isActive: boolean }[],
+  ): Promise<void> {
+    if (updates.length === 0) return;
+
+    // 트랜잭션으로 배치 업데이트
+    await this.streamerFollowRepository.manager.transaction(async (manager) => {
+      for (const update of updates) {
+        // 팔로우 관계가 존재하는지 확인
+        const follow = await manager.findOne(StreamerFollow, {
+          where: { userUuid, streamerUuid: update.streamerUuid },
+        });
+
+        if (follow) {
+          // 팔로우 관계가 있으면 isActive 상태 업데이트
+          follow.isActive = update.isActive;
+          await manager.save(follow);
+        }
+        // 팔로우 관계가 없으면 무시 (에러 발생시키지 않음)
+      }
+    });
+  }
+
+  /**
+   * 사용자의 모든 팔로우 목록 조회 (MyStreamers용)
+   * @param userUuid 사용자 UUID
+   * @returns 팔로우 중인 스트리머 목록 + 상태 정보
+   */
+  async getMyStreamers(userUuid: string): Promise<MyStreamerDto[]> {
+    const streamerFollows = await this.streamerFollowRepository.find({
+      where: { userUuid },
+      relations: ["streamer", "streamer.platforms"], // platforms 관계 추가
+      select: {
+        isActive: true,
+        createdAt: true,
+        streamer: {
+          uuid: true,
+          name: true,
+          profileImageUrl: true,
+          platforms: true, // 전체 platforms 정보 필요
+          followCount: true,
+        },
+      },
+      order: {
+        isActive: "DESC", // true 먼저
+        updatedAt: "DESC", // 최신 순
+      },
+    });
+
+    return streamerFollows.map((follow) => MyStreamerDto.of(follow));
   }
 }
