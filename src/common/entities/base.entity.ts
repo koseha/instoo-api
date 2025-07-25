@@ -37,9 +37,6 @@ export abstract class BaseAuditEntity extends InstooBaseEntity {
 
 // 버전 관리가 필요한 엔티티용 (스케줄 등)
 export abstract class BaseVersionEntity extends BaseAuditEntity {
-  @Column({ type: "timestamptz", default: () => "CURRENT_TIMESTAMP" })
-  lastUpdatedAt: Date;
-
   @Column({ default: 1 })
   version: number;
 }

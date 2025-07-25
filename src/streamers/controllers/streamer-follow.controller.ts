@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { AuthenticatedRequest, JwtAuthGuard } from "@/auth/guard/jwt-auth.guard";
 import { InstooApiResponse } from "@/common/dto/instoo-api-response.dto";
 import { StreamerFollowService } from "../services/streamer-follow.service";
-import { BatchUpdateFollowStatusDto, BatchUpdateItem } from "../dto/batch-update-follows.dto";
+import { BatchUpdateFollowStatusDto } from "../dto/batch-update-follows.dto";
 import { MyStreamerDto } from "@/users/dto/user-response.dto";
 
 @ApiTags("Streamers")
