@@ -26,9 +26,7 @@ export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOp
     ssl:
       isProduction && useSSL
         ? {
-            ca: fs
-              .readFileSync(path.join(__dirname, "..", "..", "..", "..", "rds-ca-bundle.pem"))
-              .toString(),
+            rejectUnauthorized: false,
           }
         : useSSL,
     // entities: [
