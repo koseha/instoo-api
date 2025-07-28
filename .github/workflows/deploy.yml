@@ -46,7 +46,7 @@ jobs:
         run: curl -o rds-combined-ca-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 
       - name: 📦 Zip production files
-        run: zip -r deploy.zip dist package.json .env ecosystem.config.js rds-combined-ca-bundle.pem
+        run: zip -r deploy.zip dist package.json .env ecosystem.config.ts rds-combined-ca-bundle.pem
 
       - name: 🔐 Setup SSH key
         run: |
