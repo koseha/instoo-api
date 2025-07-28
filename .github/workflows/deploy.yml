@@ -66,4 +66,4 @@ jobs:
             echo "✅ Start npm install"
             npm install --omit=dev
             echo "✅ Start PM2"
-            pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
+            pm2 restart ecosystem.config.ts || pm2 start ecosystem.config.ts
