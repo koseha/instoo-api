@@ -8,7 +8,7 @@ module.exports = {
       autorestart: true,
       watch: false,
       env: {
-        NODE_ENV: "prod",
+        NODE_ENV: "production",
       },
     },
   ],
