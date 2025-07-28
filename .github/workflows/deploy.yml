@@ -43,10 +43,10 @@ jobs:
           echo "NODE_ENV=production" >> .env
 
       - name: 📥 Download RDS SSL cert
-        run: curl -o rds-combined-ca-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+        run: curl -o rds-ca-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 
       - name: 📦 Zip production files
-        run: zip -r deploy.zip dist package.json .env ecosystem.config.ts rds-combined-ca-bundle.pem
+        run: zip -r deploy.zip dist package.json .env ecosystem.config.ts rds-ca-bundle.pem
 
       - name: 🔐 Setup SSH key
         run: |
