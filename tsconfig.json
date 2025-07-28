@@ -23,5 +23,5 @@
     "typeRoots": ["./node_modules/@types", "./types"],
     "types": ["jest", "node", "express"]
   },
-  "include": ["src/**/*", "types/**/*", "src/**/*.spec.ts", "test/**/*.ts"]
+  "include": ["src/**/*", "types/**/*", "src/**/*.spec.ts", "test/**/*.ts", "ecosystem.config.ts"]
 }
