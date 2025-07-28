@@ -9,9 +9,12 @@ import { StreamerHistory } from "@/streamers/entities/streamer-history.entity";
 import { ScheduleLike } from "@/schedules/entities/schedule-like.entity";
 import { StreamerFollow } from "@/streamers/entities/streamer-follow.entity";
 import { StreamerFollowHistory } from "@/streamers/entities/streamer-follow-history.entity";
+import * as fs from "fs";
+import * as path from "path";
 
 export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOptions => {
-  const isProduction = configService.get<string>("NODE_ENV") === "production";
+  const isProduction = configService.get<string>("NODE_ENV") === "prod";
+  const useSSL = configService.get<string>("DB_SSL") === "true";
 
   return {
     type: "postgres",
@@ -20,21 +23,29 @@ export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOp
     username: configService.get("DB_USERNAME", "postgres"),
     password: configService.get("DB_PASSWORD", ""),
     database: configService.get("DB_DATABASE", "instoo_local"),
-    // entities: [__dirname + "/../**/*.entity{.ts,.js}"],
-    entities: [
-      User,
-      Streamer,
-      StreamerPlatform,
-      Schedule,
-      ScheduleHistory,
-      StreamerHistory,
-      ScheduleLike,
-      StreamerFollow,
-      StreamerFollowHistory,
-    ],
-
+    ssl:
+      isProduction && useSSL
+        ? {
+            ca: fs
+              .readFileSync(path.join(__dirname, "..", "..", "rds-combined-ca-bundle.pem"))
+              .toString(),
+          }
+        : useSSL,
+    // entities: [
+    //   User,
+    //   Streamer,
+    //   StreamerPlatform,
+    //   Schedule,
+    //   ScheduleHistory,
+    //   StreamerHistory,
+    //   ScheduleLike,
+    //   StreamerFollow,
+    //   StreamerFollowHistory,
+    // ],
+    entities: [__dirname + "/../**/*.entity{.ts,.js}"],
     // migrations: [__dirname + "/../migrations/*{.ts,.js}"],
-    synchronize: !isProduction, // 프로덕션에서는 false
+    // synchronize: !isProduction, // 프로덕션에서는 false
+    synchronize: true, // 프로덕션에서는 false
     logging: !isProduction, // 프로덕션에서는 false
     extra: {
       timezone: "UTC",

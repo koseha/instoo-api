@@ -30,7 +30,7 @@ describe("AuthService", () => {
 
   // 테스트용 모킹 데이터
   const mockUser: User = {
-    id: 1,
+    idx: 1,
     uuid: "test-uuid-123",
     email: "test@example.com",
     nickname: "Test User",
@@ -79,7 +79,7 @@ describe("AuthService", () => {
         const config: Record<string, string> = {
           GOOGLE_CLIENT_ID: "mock-client-id",
           GOOGLE_CLIENT_SECRET: "mock-client-secret",
-          GOOGLE_CALLBACK_URL: "http://localhost:3000/auth/google/callback",
+          GOOGLE_REDIRECT_URI: "http://localhost:3000/auth/google/callback",
           JWT_SECRET: "mock-jwt-secret",
           JWT_EXPIRES_IN: "7d",
         };

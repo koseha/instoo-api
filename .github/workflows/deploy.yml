@@ -1,0 +1,69 @@
+name: Deploy to AWS EC2 on Merge to Main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout source code
+        uses: actions/checkout@v3
+
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: 📥 Install dependencies
+        run: npm install
+
+      - name: 🏗️ Build NestJS project
+        run: npm run build
+
+      - name: 🧾 Create .env
+        run: |
+          echo "DB_HOST=${{ secrets.DB_HOST }}" > .env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+          echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
+          echo "DB_SSL=${{ secrets.DB_SSL }}" >> .env
+          echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
+          echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> .env
+          echo "GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}" >> .env
+          echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> .env
+          echo "FRONTEND_SUCCESS_URL=${{ secrets.FRONTEND_SUCCESS_URL }}" >> .env
+          echo "FRONTEND_ERROR_URL=${{ secrets.FRONTEND_ERROR_URL }}" >> .env
+          echo "NODE_ENV=prod" >> .env
+
+      - name: 📥 Download RDS SSL cert
+        run: curl -o rds-combined-ca-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
+      - name: 📦 Zip production files
+        run: zip -r deploy.zip dist package.json .env ecosystem.config.js rds-combined-ca-bundle.pem
+
+      - name: 🔐 Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: 🚀 Deploy to EC2
+        run: |
+          scp -o StrictHostKeyChecking=no deploy.zip ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USERNAME }}/
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -x
+            cd /home/${{ secrets.EC2_USERNAME }}
+            rm -rf app
+            unzip -o deploy.zip -d app
+            cd app
+            echo "✅ Start npm install"
+            npm install --omit=dev
+            echo "✅ Start PM2"
+            pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js

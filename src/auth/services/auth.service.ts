@@ -57,7 +57,7 @@ export class AuthService {
   ) {
     this.googleClientId = this.configService.get<string>("GOOGLE_CLIENT_ID")!;
     this.googleClientSecret = this.configService.get<string>("GOOGLE_CLIENT_SECRET")!;
-    this.googleRedirectUri = this.configService.get<string>("GOOGLE_CALLBACK_URL")!;
+    this.googleRedirectUri = this.configService.get<string>("GOOGLE_REDIRECT_URI")!;
     this.jwtSecret = this.configService.get<string>("JWT_SECRET")!;
   }
 
