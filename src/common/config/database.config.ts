@@ -13,7 +13,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOptions => {
-  const isProduction = configService.get<string>("NODE_ENV") === "prod";
+  const isProduction = configService.get<string>("NODE_ENV") === "production";
   const useSSL = configService.get<string>("DB_SSL") === "true";
 
   return {
@@ -27,7 +27,9 @@ export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOp
       isProduction && useSSL
         ? {
             ca: fs
-              .readFileSync(path.join(__dirname, "..", "..", "rds-combined-ca-bundle.pem"))
+              .readFileSync(
+                path.join(__dirname, "..", "..", "..", "..", "rds-combined-ca-bundle.pem"),
+              )
               .toString(),
           }
         : useSSL,

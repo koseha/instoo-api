@@ -40,7 +40,7 @@ jobs:
           echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> .env
           echo "FRONTEND_SUCCESS_URL=${{ secrets.FRONTEND_SUCCESS_URL }}" >> .env
           echo "FRONTEND_ERROR_URL=${{ secrets.FRONTEND_ERROR_URL }}" >> .env
-          echo "NODE_ENV=prod" >> .env
+          echo "NODE_ENV=production" >> .env
 
       - name: 📥 Download RDS SSL cert
         run: curl -o rds-combined-ca-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
