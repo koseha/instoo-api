@@ -42,7 +42,7 @@ export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOp
     //   StreamerFollow,
     //   StreamerFollowHistory,
     // ],
-    entities: [__dirname + "/../**/*.entity{.ts,.js}"],
+    entities: [__dirname + "/../../**/*.entity{.ts,.js}"],
     // migrations: [__dirname + "/../migrations/*{.ts,.js}"],
     // logging: !isProduction, // 프로덕션에서는 false
     // synchronize: !isProduction, // 프로덕션에서는 false
