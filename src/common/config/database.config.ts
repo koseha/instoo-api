@@ -31,23 +31,11 @@ export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOp
               .toString(),
           }
         : useSSL,
-    // entities: [
-    //   User,
-    //   Streamer,
-    //   StreamerPlatform,
-    //   Schedule,
-    //   ScheduleHistory,
-    //   StreamerHistory,
-    //   ScheduleLike,
-    //   StreamerFollow,
-    //   StreamerFollowHistory,
-    // ],
     entities: [__dirname + "/../../**/*.entity{.ts,.js}"],
     // migrations: [__dirname + "/../migrations/*{.ts,.js}"],
-    // logging: !isProduction, // 프로덕션에서는 false
-    // synchronize: !isProduction, // 프로덕션에서는 false
-    synchronize: true, // 프로덕션에서는 false
-    logging: ["query", "error", "schema"],
+    logging: !isProduction, // 프로덕션에서는 false
+    synchronize: !isProduction, // 프로덕션에서는 false
+    // logging: ["query", "error", "schema"],
     extra: {
       timezone: "UTC",
     },

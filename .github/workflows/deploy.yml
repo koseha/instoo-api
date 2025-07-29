@@ -26,6 +26,7 @@ jobs:
 
       - name: 🧾 Create .env
         run: |
+          echo "CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}" >> .env
           echo "DB_HOST=${{ secrets.DB_HOST }}" > .env
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
           echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> .env
