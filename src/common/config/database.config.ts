@@ -44,9 +44,10 @@ export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOp
     // ],
     entities: [__dirname + "/../**/*.entity{.ts,.js}"],
     // migrations: [__dirname + "/../migrations/*{.ts,.js}"],
+    // logging: !isProduction, // 프로덕션에서는 false
     // synchronize: !isProduction, // 프로덕션에서는 false
     synchronize: true, // 프로덕션에서는 false
-    logging: !isProduction, // 프로덕션에서는 false
+    logging: ["query", "error", "schema"],
     extra: {
       timezone: "UTC",
     },
