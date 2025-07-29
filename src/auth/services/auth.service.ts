@@ -196,11 +196,13 @@ export class AuthService {
       ],
     });
 
+    const randomNumber = Math.floor(Math.random() * 900) + 100;
+
     if (!user) {
       // 새 사용자 생성
       user = this.userRepository.create({
         email: googleUser.email,
-        nickname: googleUser.name,
+        nickname: `${googleUser.name}_${randomNumber}`,
         // profileImageUrl: googleUser.picture,
         providerId: googleUser.id,
         provider: OAuthProvider.GOOGLE,
