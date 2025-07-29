@@ -13,6 +13,21 @@ jobs:
       - name: 📦 Checkout source code
         uses: actions/checkout@v3
 
+      # 🔄 배포 시작 알림
+      - name: 🔄 Discord Deploy Start Notification
+        run: |
+          curl -H "Content-Type: application/json" -X POST -d '{
+            "embeds": [{
+              "title": "🔄 배포 시작",
+              "description": "**${{ github.repository }}** 배포를 시작합니다...",
+              "color": 3447003,
+              "fields": [
+                {"name": "👤 배포자", "value": "${{ github.actor }}", "inline": true},
+                {"name": "💬 커밋", "value": "${{ github.event.head_commit.message }}", "inline": false}
+              ]
+            }]
+          }' ${{ secrets.DISCORD_WEBHOOK_URL }}
+
       - name: 🛠️ Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -68,3 +83,38 @@ jobs:
             npm install --omit=dev
             echo "✅ Start PM2"
             pm2 restart dist/ecosystem.config.js || pm2 start dist/ecosystem.config.js
+          EOF
+
+      # 🎉 배포 성공 알림
+      - name: 🎉 Discord Success Notification
+        if: success()
+        run: |
+          curl -H "Content-Type: application/json" -X POST -d '{
+            "embeds": [{
+              "title": "🚀 배포 완료!",
+              "description": "**${{ github.repository }}** 서버 배포가 성공적으로 완료되었습니다!",
+              "color": 65280,
+              "fields": [
+                {"name": "🌿 브랜치", "value": "${{ github.ref_name }}", "inline": true},
+                {"name": "👤 배포자", "value": "${{ github.actor }}", "inline": true},
+                {"name": "💬 커밋", "value": "${{ github.event.head_commit.message }}", "inline": false}
+              ]
+            }]
+          }' ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      # ❌ 배포 실패 알림
+      - name: ❌ Discord Failure Notification
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" -X POST -d '{
+            "embeds": [{
+              "title": "💥 배포 실패!",
+              "description": "**${{ github.repository }}** 배포 중 오류가 발생했습니다.",
+              "color": 16711680,
+              "fields": [
+                {"name": "🌿 브랜치", "value": "${{ github.ref_name }}", "inline": true},
+                {"name": "👤 시도자", "value": "${{ github.actor }}", "inline": true},
+                {"name": "🔗 로그", "value": "[확인하기](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false}
+              ]
+            }]
+          }' ${{ secrets.DISCORD_WEBHOOK_URL }}
