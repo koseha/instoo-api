@@ -166,7 +166,7 @@ export class SchedulesService {
     body: GetSchedulesDto,
     userUuid?: string, // Controller에서 JWT 토큰으로부터 추출해서 전달
   ): Promise<SchedulesResponseDto[]> {
-    const { startDate, endDate, streamerUuids } = body;
+    const { startDate, endDate, streamerUuids, platforms } = body;
 
     // 기본값 설정
     const defaultStartDate = startDate || TimeUtils.toKstDateString(new Date());
@@ -184,6 +184,11 @@ export class SchedulesService {
     // 스트리머 UUID 필터링 (선택적)
     if (streamerUuids && streamerUuids.length > 0) {
       queryBuilder.andWhere("schedule.streamerUuid IN (:...streamerUuids)", { streamerUuids });
+    }
+
+    // 플랫폼 필터링 (선택적)
+    if (platforms && platforms.length > 0) {
+      queryBuilder.andWhere("platforms.platformName IN (:...platforms)", { platforms });
     }
 
     // 정렬: 날짜 순, 시간 순

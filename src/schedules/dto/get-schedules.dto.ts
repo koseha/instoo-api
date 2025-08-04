@@ -31,4 +31,13 @@ export class GetSchedulesDto {
   @IsOptional()
   @IsDateString({}, { message: "올바른 날짜 형식이어야 합니다." })
   endDate?: string;
+
+  @ApiProperty({
+    description: "플랫폼으로 필터링",
+    required: false,
+    example: ["chzzk"],
+  })
+  @IsOptional()
+  @IsArray()
+  platforms?: string[];
 }
