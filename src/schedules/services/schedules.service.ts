@@ -382,6 +382,11 @@ export class SchedulesService {
         updateData.description = updateScheduleDto.description;
       }
 
+      // 링크 업데이트
+      if (updateScheduleDto.externalNoticeUrl !== undefined) {
+        updateData.externalNoticeUrl = updateScheduleDto.externalNoticeUrl;
+      }
+
       // 6. 시작 시간 처리
       if (updateScheduleDto.startTime !== undefined) {
         // startTime이 제공된 경우
@@ -400,6 +405,7 @@ export class SchedulesService {
           if (startTimeDateString < today) {
             throw new ApiException(ScheduleErrorCode.SCHEDULE_PAST_DATE_NOT_ALLOWED);
           }
+          console.log(startTimeDateString, existingSchedule.scheduleDate);
           if (startTimeDateString !== existingSchedule.scheduleDate) {
             throw new ApiException(ScheduleErrorCode.SCHEDULE_DATE_TIME_MISMATCH);
           }
