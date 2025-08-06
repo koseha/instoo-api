@@ -23,14 +23,16 @@ export const getDatabaseConfig = (configService: ConfigService): TypeOrmModuleOp
     username: configService.get("DB_USERNAME", "postgres"),
     password: configService.get("DB_PASSWORD", ""),
     database: configService.get("DB_DATABASE", "instoo_local"),
-    ssl:
-      isProduction && useSSL
-        ? {
-            ca: fs
-              .readFileSync(path.join(__dirname, "..", "..", "..", "..", "rds-ca-bundle.pem"))
-              .toString(),
-          }
-        : useSSL,
+    ssl: {
+      rejectUnauthorized: false,
+    },
+    // isProduction && useSSL
+    //   ? {
+    //       ca: fs
+    //         .readFileSync(path.join(__dirname, "..", "..", "..", "..", "rds-ca-bundle.pem"))
+    //         .toString(),
+    //     }
+    //   : useSSL,
     entities: [__dirname + "/../../**/*.entity{.ts,.js}"],
     // migrations: [__dirname + "/../migrations/*{.ts,.js}"],
     logging: !isProduction, // 프로덕션에서는 false
